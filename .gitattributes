@@ -1,0 +1,14 @@
+# 统一换行符，避免 Windows 提交时产生整文件 CRLF 噪声
+* text=auto
+
+# 这些是二进制资源，别做文本转换
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.zip  binary
+
+# 脚本保留 LF（服务器是 Linux，CRLF 会导致 shebang 失效）
+*.sh   text eol=lf

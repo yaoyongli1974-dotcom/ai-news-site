@@ -1,0 +1,13 @@
+# ============================================================
+# 定时任务示例 (crontab -e)
+# 让 AI 在每天 09:00 / 21:00 自动把写好的公众号文章推送到后台
+# 说明: 把 AI 生成的文章写入 payload.json，再由客户端签名推送。
+# ============================================================
+
+# 每早 9 点：推送当日文章(假设 AI 已生成 /data/wx_articles/today.json)
+0 9 * * *  /usr/bin/php /var/www/ai.xalcy.cn/scripts/push_client.php /data/wx_articles/today.json >> /var/log/ai_xalcy_push.log 2>&1
+
+# 每晚 21 点：补推一次
+0 21 * * * /usr/bin/php /var/www/ai.xalcy.cn/scripts/push_client.php /data/wx_articles/today.json >> /var/log/ai_xalcy_push.log 2>&1
+
+# 提示: 也可由 AI 自身调度(不依赖系统 cron)，直接调用 HTTPS 接口即可。

@@ -1,0 +1,22 @@
+# AI 资讯汇 —— Apache 配置(置于 public/ 目录)
+# 前提: 已启用 mod_rewrite；DocumentRoot 指向 public/
+RewriteEngine On
+
+# 阻止访问隐藏文件与敏感后缀
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+<FilesMatch "\.(sql|json|bak)$">
+    Require all denied
+</FilesMatch>
+
+# 请求非真实文件/目录时交由 index.php 处理(当前采用文件型 URL，此项可选)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
+
+DirectoryIndex index.php
+
+<IfModule mod_headers.c>
+    Header always unset X-Powered-By
+</IfModule>

@@ -1,0 +1,26 @@
+{
+  "articles": [
+    {
+      "title": "大模型推理成本下降的五个工程实践",
+      "summary": "从量化、缓存到批处理，系统梳理降低大模型调用成本的可落地手段。",
+      "content": "<p>随着大模型在业务中的广泛使用，推理成本成为关键议题。本文从五个方面给出工程实践……</p><h2>一、KV Cache 复用</h2><p>……</p>",
+      "category": "tutorial",
+      "tags": ["大模型", "AIGC", "向量数据库"],
+      "author": "AI 助手",
+      "cover_image": "https://picsum.photos/seed/ai1/800/450",
+      "source_url": "https://mp.weixin.qq.com/s/example",
+      "source_id": "wx-2026-0001",
+      "status": "published",
+      "published_at": "2026-09-10 09:30:00"
+    },
+    {
+      "title": "智能体(Agent)编排框架选型指南",
+      "summary": "对比主流智能体编排方案，给出不同场景下的选型建议。",
+      "content": "<p>智能体正在成为 AI 应用的主流形态……</p>",
+      "category": "research",
+      "tags": ["智能体", "开源"],
+      "source_id": "wx-2026-0002",
+      "status": "published"
+    }
+  ]
+}

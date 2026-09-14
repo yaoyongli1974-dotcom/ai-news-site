@@ -1,0 +1,29 @@
+# ============================================================
+# Apache 配置 (.htaccess，放置于 public/ 目录)
+# 前提: 已启用 mod_rewrite；DocumentRoot 指向 public/
+# 若使用共享主机且无法改 DocumentRoot，请将整个项目内容上传到 public_html，
+# 并把 src/、config.php、sql/ 等移到 web 根之外或保留但用本 .htaccess 拒绝访问。
+# ============================================================
+
+RewriteEngine On
+
+# 阻止访问隐藏文件与敏感后缀
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+<FilesMatch "\.(sql|json|bak)$">
+    Require all denied
+</FilesMatch>
+
+# 若请求的不是真实文件/目录，交由 index.php 处理(当前站点采用文件型 URL，此项可选)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
+
+# 默认文档
+DirectoryIndex index.php
+
+# PHP 安全：隐藏版本
+<IfModule mod_headers.c>
+    Header always unset X-Powered-By
+</IfModule>

@@ -1,0 +1,131 @@
+/* ===== AI 资讯汇 前台样式 ===== */
+:root {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --text: #1f2430;
+  --muted: #6b7280;
+  --border: #e6e8ef;
+  --primary: #2f6df6;
+  --primary-dark: #1f4fd0;
+  --accent: #12b981;
+  --radius: 12px;
+  --shadow: 0 1px 3px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.05);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.65;
+}
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 1120px; margin: 0 auto; padding: 0 18px; }
+.muted { color: var(--muted); }
+
+/* Header */
+.site-header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 20; }
+.header-inner { display: flex; align-items: center; gap: 16px; padding: 14px 18px; flex-wrap: wrap; }
+.brand { font-size: 22px; font-weight: 800; color: var(--text); }
+.brand:hover { text-decoration: none; }
+.brand-sub { color: var(--muted); font-size: 13px; flex: 1; min-width: 160px; }
+.search-box { display: flex; gap: 8px; }
+.search-box input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; width: 220px; max-width: 50vw; font-size: 14px; }
+.search-box button { padding: 8px 16px; border: 0; border-radius: 999px; background: var(--primary); color: #fff; cursor: pointer; font-size: 14px; }
+.search-box button:hover { background: var(--primary-dark); }
+.site-nav { background: var(--surface); border-bottom: 1px solid var(--border); }
+.site-nav .container { display: flex; gap: 18px; flex-wrap: wrap; padding-top: 6px; padding-bottom: 6px; }
+.site-nav a { color: var(--text); font-size: 14px; padding: 6px 2px; }
+.site-nav a:hover { color: var(--primary); text-decoration: none; }
+
+/* Layout */
+.main-grid { display: grid; grid-template-columns: 1fr 300px; gap: 28px; padding-top: 26px; padding-bottom: 40px; align-items: start; }
+@media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+.page-title { font-size: 22px; margin: 0 0 18px; }
+.empty { color: var(--muted); padding: 30px; text-align: center; background: var(--surface); border-radius: var(--radius); }
+
+/* Post cards */
+.post-list { display: flex; flex-direction: column; gap: 16px; }
+.post-card {
+  display: flex; gap: 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); transition: transform .15s ease;
+}
+.post-card:hover { transform: translateY(-2px); }
+.post-cover { width: 180px; height: 122px; object-fit: cover; border-radius: 10px; flex-shrink: 0; background: #eef1f6; }
+.post-body { min-width: 0; }
+.post-title { font-size: 18px; margin: 0 0 8px; line-height: 1.4; }
+.post-title a { color: var(--text); }
+.post-title a:hover { color: var(--primary); text-decoration: none; }
+.post-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; align-items: center; }
+.post-cat { color: var(--accent); font-weight: 600; }
+.post-summary { margin: 0; color: #3b4252; font-size: 14px; }
+@media (max-width: 560px) { .post-card { flex-direction: column; } .post-cover { width: 100%; height: 160px; } }
+
+/* Detail */
+.post-detail { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); }
+.post-detail .post-title { font-size: 28px; margin: 6px 0 14px; }
+.post-cover-lg { width: 100%; max-height: 380px; object-fit: cover; border-radius: 10px; margin: 12px 0 18px; }
+.post-content { font-size: 16px; line-height: 1.9; word-break: break-word; }
+.post-content img { max-width: 100%; border-radius: 8px; }
+/* 代码样式：行内 code 与块级 pre 必须分开定义。
+   ⚠️ 坑：只给 code 设浅色底、却不设文字色，当它嵌在深色 pre 里时会继承 pre 的浅色文字
+   → 浅灰底 + 浅白字，对比度趋近 1:1，肉眼完全不可读。 */
+.post-content code {
+  background: #eef1f6; color: #101828; padding: 2px 6px; border-radius: 6px;
+  font-family: Consolas, Menlo, "Courier New", monospace; font-size: 13.5px;
+  word-break: break-word;
+}
+.post-content pre {
+  background: #0f172a; color: #e2e8f0;
+  font-family: Consolas, Menlo, "Courier New", monospace;
+  font-size: 13px; line-height: 1.8; letter-spacing: .2px;
+  padding: 15px 17px; margin: 0 0 18px; border-radius: 10px;
+  overflow-x: auto; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere;
+}
+/* 关键：pre 内的 code 必须透明底 + 继承浅色文字（此规则特异性高于上面的 code 规则） */
+.post-content pre code {
+  background: transparent; color: inherit; padding: 0; border: 0; border-radius: 0;
+  font-size: inherit; letter-spacing: inherit;
+}
+
+/* 正文表格：微信来源的表格常只带 table 级内联样式，th/td 没有内边距与边框，
+   不兜底会挤成一团。内联样式优先级更高，此处只影响缺样式的单元格。 */
+.post-content table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: 13.5px; }
+.post-content th, .post-content td {
+  border: 1px solid var(--border); padding: 8px 10px;
+  text-align: left; vertical-align: top; line-height: 1.7;
+}
+.post-content th { background: #f4f6fb; color: var(--text); font-weight: 700; }
+
+/* 引用块：微信正文的 blockquote 多为裸标签，浏览器默认只剩缩进 */
+.post-content blockquote {
+  margin: 0 0 18px; padding: 12px 16px; background: #f7f9fc; color: #334155;
+  border-left: 4px solid var(--primary); border-radius: 0 8px 8px 0;
+}
+.post-content blockquote p:last-child { margin-bottom: 0; }
+.source { margin-top: 18px; font-size: 13px; color: var(--muted); }
+.related { margin-top: 28px; }
+.related h3 { font-size: 18px; }
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.tag { display: inline-block; padding: 4px 12px; background: #eef2ff; color: var(--primary-dark); border-radius: 999px; font-size: 13px; }
+.tag:hover { background: #e0e7ff; text-decoration: none; }
+
+/* Sidebar */
+.sidebar { display: flex; flex-direction: column; gap: 18px; position: sticky; top: 120px; }
+.widget { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+.widget h3 { margin: 0 0 12px; font-size: 15px; }
+.cat-list { list-style: none; margin: 0; padding: 0; }
+.cat-list li { padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.cat-list li:last-child { border-bottom: 0; }
+
+/* Pagination */
+.pagination { display: flex; gap: 8px; justify-content: center; margin: 26px 0; flex-wrap: wrap; }
+.pagination a { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 14px; }
+.pagination a:hover { border-color: var(--primary); text-decoration: none; }
+.pagination a.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* Footer */
+.site-footer { background: var(--surface); border-top: 1px solid var(--border); padding: 24px 0; margin-top: 20px; text-align: center; color: var(--muted); font-size: 13px; }
