@@ -14,6 +14,10 @@ scripts/push_client.config.php
 public/assets/uploads/*
 !public/assets/uploads/.htaccess
 
+# 视频上传目录（用户内容，不随代码分发；保留 .htaccess 以便目录在仓库中存在）
+public/assets/videos/*
+!public/assets/videos/.htaccess
+
 # ============================================================
 #  运行期产物与系统文件
 # ============================================================

@@ -44,9 +44,9 @@ function upload_config(): array
  * 上传目录绝对路径；不存在自动创建。
  * @throws RuntimeException 目录无法创建或不可写
  */
-function upload_dir(): string
+function upload_dir(array $cfg = null): string
 {
-    $cfg = upload_config();
+    $cfg = $cfg ?? upload_config();
     $dir = rtrim(PUBLIC_DIR, '/\\') . '/' . trim((string)$cfg['dir'], '/\\');
     if (!is_dir($dir)) {
         // 递归创建；并发下 mkdir 可能失败但目录已被别的进程建好，故再判一次
@@ -126,9 +126,9 @@ function upload_detect_mime(string $path): string
  * 文件名主干安全化：只保留 [A-Za-z0-9-_]，中文等非 ASCII 会被剔除。
  * 为空时用「日期-随机」兜底。
  */
-function upload_safe_stem(string $name): string
+function upload_safe_stem(string $name, array $cfg = null): string
 {
-    $cfg  = upload_config();
+    $cfg  = $cfg ?? upload_config();
     $name = trim($name);
 
     // 去掉用户给的扩展名——落盘扩展名一律由真实 MIME 决定
@@ -382,6 +382,163 @@ function upload_delete_file(string $name): void
     $ext  = strtolower((string)pathinfo($name, PATHINFO_EXTENSION));
     if (!in_array($ext, array_values((array)$cfg['allowed_mime']), true)) {
         throw new RuntimeException('只允许删除图片文件');
+    }
+    $dir  = rtrim(PUBLIC_DIR, '/\\') . '/' . trim((string)$cfg['dir'], '/\\');
+    $path = $dir . '/' . $name;
+
+    // 双保险：解析真实路径后必须仍在上传目录内
+    $real = realpath($path);
+    $base = realpath($dir);
+    if ($real === false || $base === false || !str_starts_with($real, $base . DIRECTORY_SEPARATOR)) {
+        throw new RuntimeException('文件不存在或不在上传目录内');
+    }
+    if (!@unlink($real)) {
+        throw new RuntimeException('删除失败，请检查目录权限');
+    }
+}
+
+/**
+ * 读取视频上传配置（与默认值合并）。
+ */
+function upload_video_config(): array
+{
+    $cfg = $GLOBALS['APP_CONFIG']['video'] ?? [];
+    if (!is_array($cfg)) {
+        $cfg = [];
+    }
+    return array_merge([
+        'dir'          => 'assets/videos',
+        'url_path'     => '/assets/videos',
+        'max_size'     => 100 * 1024 * 1024,
+        'max_files'    => 5,
+        'filename_max' => 80,
+        'allowed_mime' => [
+            'video/mp4'  => 'mp4',
+            'video/webm' => 'webm',
+        ],
+    ], $cfg);
+}
+
+/**
+ * 处理并保存一个上传的视频文件。
+ *
+ * 与图片上传的区别：视频**不做** getimagesize / 像素上限 / EXIF 剥离，
+ * 仅做 MIME 白名单 + 大小上限 + 安全命名 + 落盘。
+ *
+ * @param array  $file     $_FILES 中的单个文件项
+ * @param string $nameHint 文件名主干（可选，不含扩展名）
+ * @return array 文件元数据：name/path/url/size/mime/sha256
+ * @throws RuntimeException 任一校验或落盘环节失败
+ */
+function upload_store_video(array $file, string $nameHint = ''): array
+{
+    $cfg = upload_video_config();
+
+    // 1) PHP 层错误
+    $err = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($err !== UPLOAD_ERR_OK) {
+        throw new RuntimeException(upload_error_message($err));
+    }
+
+    // 2) 必须是本次请求真正上传的临时文件（防伪造路径）
+    $tmp = (string)($file['tmp_name'] ?? '');
+    if ($tmp === '' || !is_uploaded_file($tmp)) {
+        throw new RuntimeException('无效的上传文件来源');
+    }
+
+    // 3) 大小
+    $size = (int)filesize($tmp);
+    if ($size <= 0) {
+        throw new RuntimeException('文件内容为空');
+    }
+    if ($size > (int)$cfg['max_size']) {
+        throw new RuntimeException('视频超过大小上限 ' . upload_human_size((int)$cfg['max_size'])
+            . '（当前 ' . upload_human_size($size) . '）');
+    }
+
+    // 4) 真实类型白名单（视频不做像素/EXIF 校验）
+    $mime = upload_detect_mime($tmp);
+    $map  = (array)$cfg['allowed_mime'];
+    if (!isset($map[$mime])) {
+        throw new RuntimeException('不支持的视频格式：' . $mime . '（仅允许 ' . implode(', ', array_keys($map)) . '）');
+    }
+
+    // 5) 落盘
+    $ext    = (string)$map[$mime];
+    $dir    = upload_dir($cfg);
+    $target = upload_unique_path($dir, upload_safe_stem($nameHint, $cfg), $ext);
+    if (!@move_uploaded_file($tmp, $target)) {
+        throw new RuntimeException('文件写入失败，请检查上传目录权限');
+    }
+    @chmod($target, 0644);
+
+    $fileName = basename($target);
+    $relPath  = '/' . trim((string)$cfg['url_path'], '/') . '/' . $fileName;
+
+    return [
+        'name'   => $fileName,
+        'path'   => $relPath,      // 站内路径，写进文章正文即可
+        'url'    => url($relPath), // 绝对地址（APP_URL 拼接）
+        'size'   => (int)filesize($target),
+        'mime'   => $mime,
+        'sha256' => (string)hash_file('sha256', $target),
+    ];
+}
+
+/**
+ * 扫描视频上传目录中的文件，按修改时间倒序返回。
+ * @return array<int, array{name:string,path:string,url:string,size:int,mtime:int}>
+ */
+function upload_list_videos(): array
+{
+    $cfg = upload_video_config();
+    $dir = rtrim(PUBLIC_DIR, '/\\') . '/' . trim((string)$cfg['dir'], '/\\');
+    if (!is_dir($dir)) {
+        return [];
+    }
+    $allowedExt = array_values((array)$cfg['allowed_mime']);
+    $items = [];
+    $paths = glob($dir . '/*');
+    if (!is_array($paths)) {
+        return [];
+    }
+    foreach ($paths as $p) {
+        if (!is_file($p)) {
+            continue;
+        }
+        $ext = strtolower((string)pathinfo($p, PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowedExt, true)) {
+            continue;
+        }
+        $name = basename($p);
+        $items[] = [
+            'name'  => $name,
+            'path'  => '/' . trim((string)$cfg['url_path'], '/') . '/' . $name,
+            'url'   => url('/' . trim((string)$cfg['url_path'], '/') . '/' . $name),
+            'size'  => (int)filesize($p),
+            'mtime' => (int)filemtime($p),
+        ];
+    }
+    usort($items, static function (array $a, array $b): int {
+        return $b['mtime'] <=> $a['mtime'];
+    });
+    return $items;
+}
+
+/**
+ * 删除视频上传目录中的文件（仅允许目录内的合法文件名）。
+ * @throws RuntimeException
+ */
+function upload_delete_video(string $name): void
+{
+    $name = basename(trim($name));
+    if ($name === '' || $name === '.' || $name === '..' || !preg_match('/^[A-Za-z0-9._-]+$/', $name)) {
+        throw new RuntimeException('文件名不合法');
+    }
+    $cfg  = upload_video_config();
+    $ext  = strtolower((string)pathinfo($name, PATHINFO_EXTENSION));
+    if (!in_array($ext, array_values((array)$cfg['allowed_mime']), true)) {
+        throw new RuntimeException('只允许删除视频文件');
     }
     $dir  = rtrim(PUBLIC_DIR, '/\\') . '/' . trim((string)$cfg['dir'], '/\\');
     $path = $dir . '/' . $name;

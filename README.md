@@ -24,7 +24,7 @@ ai.xalcy.cn/
 │   ├── view.php             # 前台布局渲染
 │   ├── admin_view.php       # 后台布局渲染
 │   ├── article_service.php  # 文章写服务(后台与 API 共用)
-│   └── upload_service.php   # 图片上传服务(校验/命名/落盘,后台与 API 共用)
+│   └── upload_service.php   # 图片/视频上传服务(校验/命名/落盘,后台与 API 共用)
 ├── public/                  # ← 网站根目录(DocumentRoot 指向这里)
 │   ├── index.php            # 首页(列表+分页)
 │   ├── article.php          # 文章详情
@@ -32,14 +32,15 @@ ai.xalcy.cn/
 │   ├── tag.php              # 标签页
 │   ├── search.php           # 搜索
 │   ├── assets/              # 前台/后台 CSS
-│   │   └── uploads/         # ← 图片上传目录(自动创建;内含 .htaccess 禁脚本)
+│   │   ├── uploads/         # ← 图片上传目录(自动创建;内含 .htaccess 禁脚本)
+│   │   └── videos/          # ← 视频上传目录(自动创建;内含 .htaccess 禁脚本)
 │   ├── admin/               # 后台模块(login/logout/index/articles/uploads/categories/tags/api_tokens)
-│   └── api/                 # push.php(推文章) / upload.php(传图片)
+│   └── api/                 # push.php(推文章) / upload.php(传图片) / upload_video.php(传视频)
 ├── scripts/                 # 运维脚本
 │   ├── setup.php            # 初始化管理员 + 首个令牌(CLI)
 │   ├── check_db.php         # 数据库连通性自检(容器环境排查 db.host 用)
 │   ├── push_client.php      # 推送客户端(CLI,供 cron 调用)
-│   ├── upload_client.php    # 图片上传客户端(CLI,自动算摘要签名)
+│   ├── upload_client.php    # 上传客户端(CLI,自动算摘要签名;支持 --type=video)
 │   └── sample_payload.json  # 推送请求示例
 └── deploy/                  # 部署配置样例
     ├── nginx.conf           # 裸装 Nginx 用(含上传目录禁执行规则)
@@ -389,9 +390,9 @@ for f in res["files"]:
 
 | 层 | 参数 | 建议值 | 位置 |
 |----|------|--------|------|
-| Nginx | `client_max_body_size` | `60m` | 站点配置（1Panel → 网站 → 配置文件） |
-| PHP | `post_max_size` | `64M` | 1Panel → 运行环境 → PHP → 配置 |
-| PHP | `upload_max_filesize` | `8M` | 同上；改完重启容器 `docker restart php8-fpm` |
+| Nginx | `client_max_body_size` | `120m` | 站点配置（1Panel → 网站 → 配置文件）；视频单文件 100MB，需 ≥ 此值 |
+| PHP | `post_max_size` | `128M` | 1Panel → 运行环境 → PHP → 配置 |
+| PHP | `upload_max_filesize` | `110M` | 同上；改完重启容器 `docker restart php8-fpm` |
 
 **② 目录权限**：上传目录需对 PHP 进程可写。接口会明确报「上传目录不可写：assets/uploads」，
 调整属主/权限即可（容器内 PHP 用户常见为 `www`、`www-data` 或 `nginx`）：
@@ -410,6 +411,91 @@ chmod 755 public/assets/uploads && chown -R www:www public/assets/uploads   # �
 **④ 其他**：`strip_exif`（默认开）会对 JPEG 重新编码以剥离 EXIF/GPS 与潜在载荷；
 关闭 `require_https` 仅建议本地调试；上传审计记录在 `push_logs` 表，`action = upload`。
 
+### 10. 视频上传接口（/api/upload_video.php）
+
+与图片接口同源、同一套鉴权，区别在于「接受 mp4/webm、单文件 100MB、返回 `<video>` 片段」。
+视频不做像素/EXIF 校验，也**不做服务端转码** —— 请上传浏览器原生支持的封装
+（H.264/AAC 的 mp4，或 VP9/Opus 的 webm），否则部分浏览器可能播放不了。
+
+| 项目 | 值 |
+|------|-----|
+| 地址 | `POST https://ai.xalcy.cn/api/upload_video.php` |
+| Content-Type | `multipart/form-data` |
+| 单文件上限 | 默认 **100 MB**（`config.php` → `video.max_size`） |
+| 单次个数 | 默认 **5 个**（`video.max_files`） |
+| 支持类型 | `video/mp4`、`video/webm` |
+| 存放目录 | `public/assets/videos/`（**不存在时自动创建**，权限 0755） |
+| URL 前缀 | `/assets/videos/`（`video.url_path`） |
+
+> 仅需 `video` 段可选配；**不配置也能用**，代码内置了上述默认值。
+
+**鉴权**：与图片接口完全一致（X-Api-Key + X-Timestamp + X-Signature，或 Bearer）。
+签名对象同样是「文件内容 sha256 摘要」（multipart 下 php://input 为空，无法签原始请求体）。
+
+**成功响应（HTTP 200）**
+
+```json
+{
+  "success": true,
+  "count": 1,
+  "failed": 0,
+  "files": [
+    {
+      "name": "ai-demo-2026-01.mp4",
+      "path": "/assets/videos/ai-demo-2026-01.mp4",
+      "url":  "https://ai.xalcy.cn/assets/videos/ai-demo-2026-01.mp4",
+      "html": "<video controls preload=\"metadata\" src=\"https://ai.xalcy.cn/assets/videos/ai-demo-2026-01.mp4\"></video>",
+      "markdown": "<video controls preload=\"metadata\" src=\"...\"></video>",
+      "size": 18342912,
+      "mime": "video/mp4",
+      "sha256": "9f2c1b..."
+    }
+  ],
+  "errors": []
+}
+```
+
+返回里 `html` / `markdown` 都是可直接粘贴进文章正文（内容字段支持 HTML）的 `<video>` 片段。
+
+**错误码**：与图片接口一致（`405/403/401/413/400`，`no_file` / `too_many_files` / `upload_failed` 等），
+单文件失败常见原因：超过大小上限、不支持的视频格式、文件内容为空、上传目录不可写。
+
+**CLI 上传（图片/视频共用一个脚本，用 `--type=video` 切换）**
+
+```bash
+php scripts/upload_client.php demo.mp4 --type=video --name=ai-demo-2026
+php scripts/upload_client.php demo.mp4 --type=video --json
+```
+
+**Python（AI 自动化流程）**
+
+```python
+import os, hashlib, hmac, time, requests
+API_URL    = "https://ai.xalcy.cn/api/upload_video.php"
+API_KEY    = os.environ["AIXALCY_API_KEY"]
+API_SECRET = os.environ["AIXALCY_API_SECRET"]
+
+def upload_videos(paths, name=""):
+    ts = str(int(time.time()))
+    digests = [hashlib.sha256(open(p, "rb").read()).hexdigest() for p in paths]
+    base = ts + "." + ".".join(digests)
+    sig  = hmac.new(API_SECRET.encode(), base.encode(), hashlib.sha256).hexdigest()
+    files = [("files[]", (os.path.basename(p), open(p, "rb"), "video/mp4")) for p in paths]
+    data = {"name": name} if name else {}
+    resp = requests.post(API_URL, timeout=300, files=files, data=data,
+                         headers={"X-Api-Key": API_KEY, "X-Timestamp": ts, "X-Signature": sig})
+    resp.raise_for_status()
+    return resp.json()
+
+res = upload_videos(["demo.mp4"], name="ai-demo-2026")
+for f in res["files"]:
+    print(f["html"])   # 直接写进文章正文
+```
+
+**与 AI 自动入库的配合**：① 上传视频拿 `<video>` 片段 → ② 写进文章 `content`
+→ ③ `POST /api/push.php` 入库（同套 Key/Secret）→ ④ 前台即可播放。
+后台「媒体库」顶部可切换「图片 / 视频」标签查看或删除已传视频。
+
 ---
 
 ## 四、后台功能
@@ -420,7 +506,7 @@ chmod 755 public/assets/uploads && chown -R www:www public/assets/uploads   # �
 | 仪表盘 | `/admin/index.php` | 统计概览 + 最近文章 + 最近推送 |
 | 文章 | `/admin/articles.php` | 列表/搜索/筛选/删除（CSRF 保护） |
 | 编辑 | `/admin/article_form.php` | 新建/编辑，支持分类、标签、状态、发布时间、`source_id` |
-| 媒体库 | `/admin/uploads.php` | 图片浏览（缩略图/尺寸/体积）、复制链接、直接上传、删除；与上传接口共用同一目录 |
+| 媒体库 | `/admin/uploads.php` | 图片/视频浏览（缩略图/体积）、复制链接、直接上传、删除；与上传接口共用同一目录 |
 | 分类 | `/admin/categories.php` | 增删改查 |
 | 标签 | `/admin/tags.php` | 增删改查（含文章计数） |
 | 令牌 | `/admin/api_tokens.php` | 生成/启用/停用/删除推送令牌，密钥仅显示一次 |

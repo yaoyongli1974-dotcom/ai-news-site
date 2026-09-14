@@ -70,6 +70,8 @@ a:hover { text-decoration: underline; }
 .post-cover-lg { width: 100%; max-height: 380px; object-fit: cover; border-radius: 10px; margin: 12px 0 18px; }
 .post-content { font-size: 16px; line-height: 1.9; word-break: break-word; }
 .post-content img { max-width: 100%; border-radius: 8px; }
+/* 正文视频：占满正文宽度、保持比例；深色背景避免透明/黑边突兀 */
+.post-content video { max-width: 100%; height: auto; border-radius: 8px; background: #000; margin: 0 0 18px; }
 /* 代码样式：行内 code 与块级 pre 必须分开定义。
    ⚠️ 坑：只给 code 设浅色底、却不设文字色，当它嵌在深色 pre 里时会继承 pre 的浅色文字
    → 浅灰底 + 浅白字，对比度趋近 1:1，肉眼完全不可读。 */

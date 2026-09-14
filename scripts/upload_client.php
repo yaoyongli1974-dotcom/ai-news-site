@@ -11,14 +11,16 @@
  *   --name=主干名    文件名主干(不含扩展名)。多张时自动追加 -01/-02 序号，
  *                    最终形如 10-person-team-ai-efficiency-01.jpg
  *   --alt=替代文本   生成 <img alt> / Markdown 时使用
- *   --url=接口地址   默认由 api_url 推导(push.php → upload.php)
+ *   --type=video     切换为视频上传模式(接口改为 /api/upload_video.php，接受 mp4/webm)
+ *   --url=接口地址   默认由 api_url 推导(push.php → upload.php / upload_video.php)
  *   --json           只输出 JSON，便于脚本/AI 直接解析
  *   --dry-run        只打印将要发送的签名与文件清单，不实际请求
  *
  * 配置(按优先级): 环境变量 > scripts/push_client.config.php > 本文件默认值
- *   AIXALCY_UPLOAD_URL / AIXALCY_API_KEY / AIXALCY_API_SECRET
+ *   图片: AIXALCY_UPLOAD_URL / AIXALCY_API_KEY / AIXALCY_API_SECRET
+ *   视频: AIXALCY_VIDEO_UPLOAD_URL / AIXALCY_API_KEY / AIXALCY_API_SECRET
  *
- * 签名规则(与 /api/upload.php 一致):
+ * 签名规则(与 /api/upload.php、/api/upload_video.php 一致):
  *   X-Signature = HMAC-SHA256(
  *       timestamp + "." + sha256(文件1内容) [+ "." + sha256(文件2内容) ...],
  *       API_SECRET
@@ -31,14 +33,10 @@ $configFile = __DIR__ . '/push_client.config.php';
 $cfg = is_file($configFile) ? require $configFile : [];
 if (!is_array($cfg)) { $cfg = []; }
 
-$apiUrl    = (string)(getenv('AIXALCY_UPLOAD_URL') ?: ($cfg['upload_url'] ?? ''));
+$mediaType = 'image';
+$apiUrl    = '';
 $apiKey    = (string)(getenv('AIXALCY_API_KEY')    ?: ($cfg['api_key'] ?? ''));
 $apiSecret = (string)(getenv('AIXALCY_API_SECRET') ?: ($cfg['api_secret'] ?? ''));
-if ($apiUrl === '') {
-    // 未显式配置时，由 push 接口地址推导，避免用户重复填写
-    $pushUrl = (string)(getenv('AIXALCY_API_URL') ?: ($cfg['api_url'] ?? 'https://ai.xalcy.cn/api/push.php'));
-    $apiUrl  = preg_replace('#/push\.php$#', '/upload.php', $pushUrl) ?: $pushUrl;
-}
 
 if ($apiKey === '' || $apiSecret === '') {
     fwrite(STDERR, "缺少 API Key / Secret，请通过环境变量或 scripts/push_client.config.php 配置。\n");
@@ -56,14 +54,30 @@ $urlGiven = false;
 foreach (array_slice($argv, 1) as $arg) {
     if (preg_match('/^--name=(.*)$/s', $arg, $m))        { $nameHint = $m[1]; continue; }
     if (preg_match('/^--alt=(.*)$/s', $arg, $m))         { $alt = $m[1]; continue; }
+    if (preg_match('/^--type=(.*)$/s', $arg, $m))         { $mediaType = $m[1] === 'video' ? 'video' : 'image'; continue; }
     if (preg_match('/^--url=(.*)$/s', $arg, $m))         { $apiUrl = $m[1]; $urlGiven = true; continue; }
     if ($arg === '--json')    { $asJson = true; continue; }
     if ($arg === '--dry-run') { $dryRun = true; continue; }
     if ($arg === '-h' || $arg === '--help') {
-        fwrite(STDOUT, "用法: php scripts/upload_client.php 图片1.jpg [图片2.jpg ...] [--name=主干名] [--alt=说明] [--json]\n");
+        fwrite(STDOUT, "用法: php scripts/upload_client.php 文件1 [文件2 ...] [--type=video] [--name=主干名] [--alt=说明] [--json]\n");
         exit(0);
     }
     $files[] = $arg;
+}
+
+// ---- 解析接口地址（在 --type 确定之后，避免视频被错误推导到图片接口） ----
+if (!$urlGiven) {
+    if ($mediaType === 'video') {
+        $apiUrl = (string)(getenv('AIXALCY_VIDEO_UPLOAD_URL') ?: ($cfg['video_upload_url'] ?? ''));
+    } else {
+        $apiUrl = (string)(getenv('AIXALCY_UPLOAD_URL') ?: ($cfg['upload_url'] ?? ''));
+    }
+    if ($apiUrl === '') {
+        // 未显式配置时，由 push 接口地址推导，避免用户重复填写
+        $pushUrl = (string)(getenv('AIXALCY_API_URL') ?: ($cfg['api_url'] ?? 'https://ai.xalcy.cn/api/push.php'));
+        $target  = $mediaType === 'video' ? '/upload_video.php' : '/upload.php';
+        $apiUrl  = preg_replace('#/push\.php$#', $target, $pushUrl) ?: $pushUrl;
+    }
 }
 
 if (!$files) {
@@ -134,7 +148,8 @@ if ($asJson) {
     $decoded = json_decode((string)$response, true);
     if (is_array($decoded) && !empty($decoded['success']) && !empty($decoded['files'])) {
         foreach ($decoded['files'] as $f) {
-            echo "已上传: {$f['name']}  ({$f['width']}×{$f['height']}, {$f['size']} B)\n";
+            $dims = isset($f['width'], $f['height']) ? "{$f['width']}×{$f['height']}, " : '';
+            echo "已上传: {$f['name']}  ({$dims}{$f['size']} B)\n";
             echo "  URL:      {$f['url']}\n";
             echo "  站内路径: {$f['path']}\n";
             echo "  HTML:     {$f['html']}\n";

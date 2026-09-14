@@ -45,6 +45,21 @@ return [
         ],
     ],
 
+    // ---- 视频上传 ----
+    'video' => [
+        'dir'          => 'assets/videos', // 相对 public/ 的存放目录(不存在会自动创建)
+        'url_path'     => '/assets/videos',// 对外 URL 前缀，返回给调用方
+        'max_size'     => 100 * 1024 * 1024, // 单文件上限(字节)，默认 100MB
+        'max_files'    => 5,               // 单次请求最多个数
+        'filename_max' => 80,              // 文件名主干最大长度
+        // 允许的类型: MIME => 落盘扩展名(扩展名由服务端按真实 MIME 决定)
+        // 仅接受网页原生支持的封装：H.264/AAC 的 mp4、VP9/Opus 的 webm。
+        'allowed_mime' => [
+            'video/mp4'  => 'mp4',
+            'video/webm' => 'webm',
+        ],
+    ],
+
     // ---- 后台 ----
     'admin' => [
         'session_name' => 'AIXALCY_ADMIN',
