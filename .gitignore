@@ -26,6 +26,9 @@ _tmp/
 *.bak
 *.tmp
 
+# 升级包（本地部署用，不随代码分发）
+upgrade-*.zip
+
 # Windows / macOS
 Thumbs.db
 Desktop.ini
