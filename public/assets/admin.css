@@ -93,3 +93,24 @@ table.tbl tr:hover td { background: #fafbff; }
 }
 .pagination a:hover { border-color: var(--primary); text-decoration: none; }
 .pagination a.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* ===== 后台移动端适配（≤768px） =====
+   根因：.admin-shell 为 flex 横向布局，.admin-side 固定 220px 且 flex-shrink:0，
+   在手机窄屏下主内容区被压到 ~150px，导致表格/工具栏/按钮溢出、错位、重叠。
+   修复：窄屏改为竖向堆叠（侧边栏变顶部导航），主内容全宽；多列表格横向滚动。
+   桌面端（>768px）完全走原规则，不受影响。 */
+@media (max-width: 768px) {
+  .admin-shell { flex-direction: column; }
+  .admin-side { width: 100%; padding: 10px 14px; }
+  .admin-brand { padding: 4px 10px 10px; font-size: 16px; }
+  .admin-side nav { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .admin-side nav a { padding: 8px 12px; font-size: 13px; white-space: nowrap; }
+  .admin-main { padding: 14px 14px 28px; }
+  .admin-topbar { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .admin-topbar h1 { font-size: 18px; }
+  .admin-content { padding: 14px; }
+  /* 多列表格在窄屏溢出时横向滚动，避免挤出屏幕导致错位/重叠、按钮不可点 */
+  table.tbl { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .toolbar { gap: 8px; }
+  .toolbar input[type=text] { flex: 1 1 160px; min-width: 0; }
+}
