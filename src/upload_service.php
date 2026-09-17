@@ -553,3 +553,95 @@ function upload_delete_video(string $name): void
         throw new RuntimeException('删除失败，请检查目录权限');
     }
 }
+
+/**
+ * 读取品牌图(站点 LOGO / 浏览器图标)上传配置。
+ */
+function upload_brand_config(): array
+{
+    $cfg = $GLOBALS['APP_CONFIG']['brand'] ?? [];
+    if (!is_array($cfg)) {
+        $cfg = [];
+    }
+    return array_merge([
+        'dir'          => 'assets/branding',   // 相对 public/ 的存放目录(不存在会自动创建)
+        'url_path'     => '/assets/branding',  // 对外 URL 前缀
+        'max_size'     => 2 * 1024 * 1024,     // 品牌图较小，2MB 足够
+        'filename_max' => 60,
+        // 允许的类型: MIME => 落盘扩展名(扩展名由服务端按真实 MIME 决定)
+        'allowed_mime' => [
+            'image/jpeg'              => 'jpg',
+            'image/png'               => 'png',
+            'image/gif'               => 'gif',
+            'image/webp'              => 'webp',
+            'image/x-icon'            => 'ico',            // 浏览器图标常用封装
+            'image/vnd.microsoft.icon' => 'ico',
+        ],
+    ], $cfg);
+}
+
+/**
+ * 处理并保存一个品牌图(站点 LOGO / 浏览器图标)。
+ *
+ * 与图片上传(upload_store_file)的区别：不强制 getimagesize / 像素上限 / EXIF 剥离，
+ * 以保留透明背景(PNG)与 .ico 的多分辨率格式；仅做 MIME 白名单 + 大小上限 + 安全命名 + 落盘。
+ * 扩展名一律由服务端检测出的真实 MIME 决定，双扩展名攻击天然无效。
+ *
+ * @param array  $file     $_FILES 中的单个文件项
+ * @param string $nameHint 文件名主干（可选，不含扩展名）
+ * @return array 文件元数据：name/path/url/size/mime
+ * @throws RuntimeException 任一校验或落盘环节失败
+ */
+function upload_store_brand(array $file, string $nameHint = ''): array
+{
+    $cfg = upload_brand_config();
+
+    // 1) PHP 层错误
+    $err = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($err !== UPLOAD_ERR_OK) {
+        throw new RuntimeException(upload_error_message($err));
+    }
+
+    // 2) 必须是本次请求真正上传的临时文件（防伪造路径）
+    $tmp = (string)($file['tmp_name'] ?? '');
+    if ($tmp === '' || !is_uploaded_file($tmp)) {
+        throw new RuntimeException('无效的上传文件来源');
+    }
+
+    // 3) 大小
+    $size = (int)filesize($tmp);
+    if ($size <= 0) {
+        throw new RuntimeException('文件内容为空');
+    }
+    if ($size > (int)$cfg['max_size']) {
+        throw new RuntimeException('图片超过大小上限 ' . upload_human_size((int)$cfg['max_size'])
+            . '（当前 ' . upload_human_size($size) . '）');
+    }
+
+    // 4) 真实类型白名单（不依赖 getimagesize，兼容 .ico）
+    $mime = upload_detect_mime($tmp);
+    $map  = (array)$cfg['allowed_mime'];
+    if (!isset($map[$mime])) {
+        throw new RuntimeException('不支持的文件类型：' . $mime . '（仅允许 ' . implode(', ', array_keys($map)) . '）');
+    }
+
+    // 5) 落盘（保留原图，不做重编码/裁切）
+    $ext    = (string)$map[$mime];
+    $dir    = upload_dir($cfg);
+    $target = upload_unique_path($dir, upload_safe_stem($nameHint, $cfg), $ext);
+    if (!@move_uploaded_file($tmp, $target)) {
+        throw new RuntimeException('文件写入失败，请检查上传目录权限');
+    }
+    @chmod($target, 0644);
+
+    $fileName = basename($target);
+    $relPath  = '/' . trim((string)$cfg['url_path'], '/') . '/' . $fileName;
+
+    return [
+        'name' => $fileName,
+        'path' => $relPath,      // 站内路径
+        'url'  => url($relPath), // 绝对地址（APP_URL 拼接）
+        'size' => (int)filesize($target),
+        'mime' => $mime,
+    ];
+}

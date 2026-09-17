@@ -19,6 +19,9 @@ function render_page(string $title, string $body, array $meta = []): void
     $og   = e($meta['og_image'] ?? '');
     $canonical = e($meta['canonical'] ?? '');
     $subtitle = e(get_option('site_subtitle', ''));
+    $siteLogo = get_option('site_logo', '');
+    $siteIcon = get_option('site_icon', '');
+    $icp      = get_option('site_icp', '');
 
     header('Content-Type: text/html; charset=utf-8');
     echo '<!DOCTYPE html>' . "\n";
@@ -34,12 +37,16 @@ function render_page(string $title, string $body, array $meta = []): void
   <meta property="og:type" content="website">
   <?php if ($og !== ''): ?><meta property="og:image" content="<?= $og ?>"><?php endif; ?>
   <?php if ($canonical !== ''): ?><link rel="canonical" href="<?= $canonical ?>"><?php endif; ?>
+  <?php if ($siteIcon !== ''): ?><link rel="icon" href="<?= e($siteIcon) ?>"><?php endif; ?>
   <link rel="stylesheet" href="<?= asset('/assets/style.css') ?>">
 </head>
 <body>
   <header class="site-header">
     <div class="container header-inner">
-      <a class="brand" href="<?= url('/') ?>"><?= e($siteTitle) ?></a>
+      <a class="brand" href="<?= url('/') ?>">
+        <?php if ($siteLogo !== ''): ?><img class="brand-logo" src="<?= e($siteLogo) ?>" alt="<?= e($siteTitle) ?>">
+        <?php endif; ?><?= e($siteTitle) ?>
+      </a>
       <span class="brand-sub"><?= $subtitle ?></span>
       <form class="search-box" action="<?= url('/search.php') ?>" method="get" role="search">
         <input type="search" name="q" placeholder="搜索文章…" value="<?= e($_GET['q'] ?? '') ?>" aria-label="搜索">
@@ -65,7 +72,7 @@ function render_page(string $title, string $body, array $meta = []): void
 
   <footer class="site-footer">
     <div class="container">
-      <p><?= e(get_option('footer_text', '© ' . date('Y') . ' AI 资讯汇')) ?></p>
+      <p><?= e(get_option('footer_text', '© ' . date('Y') . ' AI 资讯汇')) ?><?php if ($icp !== ''): ?> · <span class="icp"><?= e($icp) ?></span><?php endif; ?></p>
     </div>
   </footer>
 </body>

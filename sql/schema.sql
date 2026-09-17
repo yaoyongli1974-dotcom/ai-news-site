@@ -159,4 +159,7 @@ INSERT INTO `options` (`key`, `value`) VALUES
 ('site_description', 'AI 资讯汇聚合展示人工智能相关的微信公众号文章，涵盖行业资讯、技术教程、产品评测与研究前沿。'),
 ('site_keywords',    'AI,人工智能,大模型,AIGC,智能体,公众号'),
 ('posts_per_page',   '10'),
-('footer_text',      '© 2026 AI 资讯汇 · Powered by PHP & MySQL');
+('footer_text',      '© 2026 AI 资讯汇 · Powered by PHP & MySQL'),
+('site_icp',         ''),
+('site_logo',        ''),
+('site_icon',        '');

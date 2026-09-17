@@ -31,6 +31,7 @@ function admin_layout(string $title, string $body, string $active = ''): void
         'uploads'    => ['label' => '媒体库',   'href' => '/admin/uploads.php'],
         'categories' => ['label' => '分类管理', 'href' => '/admin/categories.php'],
         'tags'       => ['label' => '标签管理', 'href' => '/admin/tags.php'],
+        'settings'   => ['label' => '站点配置', 'href' => '/admin/settings.php'],
         'tokens'     => ['label' => '接口令牌', 'href' => '/admin/api_tokens.php'],
     ];
     $flash = get_flash();
@@ -53,7 +54,11 @@ function admin_layout(string $title, string $body, string $active = ''): void
 <body>
   <div class="admin-shell">
     <aside class="admin-side">
-      <div class="admin-brand"><?= e(get_option('site_title', 'AI 资讯汇')) ?><small>后台</small></div>
+      <div class="admin-brand">
+        <?php $adminLogo = get_option('site_logo', ''); ?>
+        <?php if ($adminLogo !== ''): ?><img class="admin-brand-logo" src="<?= e($adminLogo) ?>" alt="logo"><?php endif; ?>
+        <?= e(get_option('site_title', 'AI 资讯汇')) ?><small>后台</small>
+      </div>
       <nav>
         <?php foreach ($nav as $k => $n): ?>
           <a class="<?= $k === $active ? 'active' : '' ?>" href="<?= url($n['href']) ?>"><?= e($n['label']) ?></a>

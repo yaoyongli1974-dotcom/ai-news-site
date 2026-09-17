@@ -1,0 +1,30 @@
+# 品牌图目录安全策略（Apache 适用；1Panel/OpenResty 请用 deploy/nginx-uploads-snippet.conf）
+#
+# 品牌图目录(站点 LOGO / 浏览器图标)只应作为「静态图片」对外，绝不允许其中的任何文件被当作脚本执行。
+# 本项目落盘时已强制扩展名为 jpg/png/gif/webp/ico，这里是第二道防线。
+
+# 1) 拒绝访问任何脚本类型
+<FilesMatch "\.(php|php[0-9]|phtml|phar|pl|py|cgi|sh|shtml|asp|aspx|jsp)$">
+    Require all denied
+</FilesMatch>
+
+# 2) 即使被解析也不按脚本处理（双保险）
+<IfModule mod_mime.c>
+    RemoveHandler .php .phtml .phar .pl .py .cgi
+    AddType text/plain .php .phtml .phar
+</IfModule>
+
+# 3) 不执行 CGI
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+
+# 4) 关闭目录列表
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>
+
+# 5) 防止 MIME 嗅探
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>

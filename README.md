@@ -24,7 +24,7 @@ ai.xalcy.cn/
 │   ├── view.php             # 前台布局渲染
 │   ├── admin_view.php       # 后台布局渲染
 │   ├── article_service.php  # 文章写服务(后台与 API 共用)
-│   └── upload_service.php   # 图片/视频上传服务(校验/命名/落盘,后台与 API 共用)
+│   └── upload_service.php   # 图片/视频/品牌图上传服务(校验/命名/落盘,后台与 API 共用)
 ├── public/                  # ← 网站根目录(DocumentRoot 指向这里)
 │   ├── index.php            # 首页(列表+分页)
 │   ├── article.php          # 文章详情
@@ -33,8 +33,9 @@ ai.xalcy.cn/
 │   ├── search.php           # 搜索
 │   ├── assets/              # 前台/后台 CSS
 │   │   ├── uploads/         # ← 图片上传目录(自动创建;内含 .htaccess 禁脚本)
-│   │   └── videos/          # ← 视频上传目录(自动创建;内含 .htaccess 禁脚本)
-│   ├── admin/               # 后台模块(login/logout/index/articles/uploads/categories/tags/api_tokens)
+│   │   ├── videos/          # ← 视频上传目录(自动创建;内含 .htaccess 禁脚本)
+│   │   └── branding/        # ← 品牌图目录(LOGO/图标,自动创建;内含 .htaccess 禁脚本)
+│   ├── admin/               # 后台模块(login/logout/index/articles/uploads/categories/tags/settings/api_tokens)
 │   └── api/                 # push.php(推文章) / upload.php(传图片) / upload_video.php(传视频)
 ├── scripts/                 # 运维脚本
 │   ├── setup.php            # 初始化管理员 + 首个令牌(CLI)
@@ -510,6 +511,33 @@ for f in res["files"]:
 | 分类 | `/admin/categories.php` | 增删改查 |
 | 标签 | `/admin/tags.php` | 增删改查（含文章计数） |
 | 令牌 | `/admin/api_tokens.php` | 生成/启用/停用/删除推送令牌，密钥仅显示一次 |
+| 站点配置 | `/admin/settings.php` | 可视化编辑站点名称/副标题/关键词/描述/每页条数/页脚/ICP 备案号/LOGO/浏览器图标；保存即时生效，无需改代码 |
+
+---
+
+## 四-甲、站点配置管理（可视化后台）
+
+后台「站点配置」页允许管理员在网页上直接修改站点基础信息，**无需改动代码**，保存后前台立即生效（配置存于 `options` 表）。
+
+**可配置项**
+| 配置项 | 选项键 | 说明 |
+|--------|--------|------|
+| 站点名称 | `site_title` | 前台标题、导航品牌、`<title>` 后缀 |
+| 站点副标题 | `site_subtitle` | 导航栏副标题 |
+| 站点关键词 | `site_keywords` | Meta Keywords（逗号分隔） |
+| 每页文章数 | `posts_per_page` | 列表分页大小（≥1） |
+| 站点描述 | `site_description` | Meta Description（SEO） |
+| 页脚文字 | `footer_text` | 页脚版权/说明 |
+| ICP 备案号 | `site_icp` | 页脚展示的备案信息 |
+| 站点 LOGO | `site_logo` | 导航与后台品牌图；可填外链 URL，或在后台直接上传（PNG/JPG/GIF/WebP，建议透明 PNG） |
+| 浏览器图标 | `site_icon` | favicon；可填外链 URL，或在后台直接上传（.ico / .png 等） |
+
+**上传/清除规则（LOGO 与图标同款）**
+- 选择本地文件上传 → 存到 `public/assets/branding/`，覆盖原 URL；
+- 留空文件、在 URL 框填外链 → 使用外链（仅允许 `http(s)://` 或站内 `/` 开头，防伪协议）；
+- 勾选「清除」→ 置空，前台回退到文字站名 / 无图标。
+
+**安全**：品牌图目录 `assets/branding/` 内含 `.htaccess`（Apache）与 Nginx 规则（见 `deploy/nginx-uploads-snippet.conf`），禁止其中任何文件被当作脚本执行；上传采用与服务端真实 MIME 决定的扩展名，双扩展名攻击天然无效。品牌图较小（2MB 上限），不触及 PHP/Nginx 的上传体积上限。
 
 ---
 
