@@ -240,3 +240,72 @@ function related_articles(int $articleId, int $categoryId, int $limit = 5): arra
     $params[] = $limit;
     return db_fetch_all($sql, $params);
 }
+
+// ---------------- 结构化数据 (Schema.org / JSON-LD) ----------------
+
+/**
+ * 输出 JSON-LD 结构化数据块，便于搜索引擎与 AI 爬虫理解页面语义。
+ * @param array $data Schema.org 关联数组
+ * @param bool  $wrap 是否包裹 <script> 标签（默认 true）
+ */
+function json_ld(array $data, bool $wrap = true): string
+{
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    if ($json === false) {
+        return '';
+    }
+    // 防止内容中的 </script> 提前闭合脚本块
+    $json = str_replace('<', '\\u003c', $json);
+    if (!$wrap) {
+        return $json;
+    }
+    return '<script type="application/ld+json">' . $json . '</script>';
+}
+
+/** 日期转 ISO8601（机器可读），失败或为空返回 '' */
+function iso8601(?string $dt): string
+{
+    if ($dt === null || $dt === '') {
+        return '';
+    }
+    $ts = strtotime($dt);
+    return $ts === false ? '' : date('c', $ts);
+}
+
+/**
+ * 生成面包屑导航（机器可读的有序列表）。
+ * @param array $items [['name'=>, 'url'=>], ...] 末项视为当前页
+ */
+function breadcrumb_html(array $items): string
+{
+    if (empty($items)) {
+        return '';
+    }
+    $html = '<nav class="breadcrumb" aria-label="面包屑"><ol>';
+    $last = count($items) - 1;
+    foreach ($items as $i => $it) {
+        $name = e($it['name'] ?? '');
+        if ($i === $last) {
+            $html .= '<li><span aria-current="page">' . $name . '</span></li>';
+        } else {
+            $html .= '<li><a href="' . attr($it['url'] ?? '#') . '">' . $name . '</a></li>';
+        }
+    }
+    $html .= '</ol></nav>';
+    return $html;
+}
+
+/** 生成 BreadcrumbList 结构化数据(Schema.org)，与 breadcrumb_html 共用 $items 结构 */
+function breadcrumb_ld(array $items): array
+{
+    $els = [];
+    foreach ($items as $i => $it) {
+        $els[] = [
+            '@type'    => 'ListItem',
+            'position' => $i + 1,
+            'name'     => $it['name'] ?? '',
+            'item'     => $it['url'] ?? '',
+        ];
+    }
+    return ['@type' => 'BreadcrumbList', 'itemListElement' => $els];
+}

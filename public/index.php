@@ -26,7 +26,19 @@ $body = '<h1 class="page-title">最新文章</h1>';
 $body .= article_cards($articles);
 $body .= render_pagination($p);
 
+$listEls = [];
+foreach ($articles as $i => $a) {
+    $listEls[] = [
+        '@type'    => 'ListItem',
+        'position' => $i + 1,
+        'url'      => url('/article.php?slug=' . rawurlencode($a['slug'])),
+        'name'     => $a['title'],
+    ];
+}
+$itemList = ['@context' => 'https://schema.org', '@type' => 'ItemList', 'itemListElement' => $listEls];
+
 render_page('', $body, [
     'description' => get_option('site_description', ''),
     'canonical'   => url('/'),
+    'json_ld'     => $itemList,
 ]);

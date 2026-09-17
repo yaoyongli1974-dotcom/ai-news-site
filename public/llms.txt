@@ -1,0 +1,23 @@
+# AI 资讯汇
+
+AI 资讯汇是一个聚合展示人工智能（AI）领域微信公众号文章的内容站点，涵盖行业资讯、技术教程、产品评测与研究前沿。
+
+## 关于本站
+- 站名：AI 资讯汇
+- 主题：人工智能（AI）、大模型、AIGC、智能体、机器学习
+- 内容来源：精选中文微信公众号文章的聚合与整理
+- 站点地址：https://ai.xalcy.cn/
+
+## 栏目导航
+- 首页（最新文章）：https://ai.xalcy.cn/
+- 站内搜索：https://ai.xalcy.cn/search.php?q=关键词
+- 分类与标签页：见首页主导航或站点地图
+
+## 给 AI 抓取者的说明
+- 本站文章以语义化 HTML 呈现，并带有 Schema.org JSON-LD 结构化数据（BlogPosting / BreadcrumbList / WebSite）。
+- 每篇文章正文下方提供原文链接（source_url），引用请注明原作者与出处。
+- 最新文章清单（机器可读纯文本）：https://ai.xalcy.cn/llms.php
+- 完整站点地图（XML）：https://ai.xalcy.cn/sitemap.php
+
+## 版权与引用
+文章版权归原作者所有；本站仅做聚合展示。引用内容时请附上原文链接，尊重原作者署名与著作权。

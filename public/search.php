@@ -40,6 +40,26 @@ if ($q !== '') {
     $body .= '<p class="muted">请输入关键词进行搜索。</p>';
 }
 
+$crumbs = [
+    ['name' => '首页', 'url' => url('/')],
+    [
+        'name' => $q !== '' ? '搜索：' . $q : '搜索',
+        'url'  => $q !== '' ? url('/search.php?q=' . rawurlencode($q)) : url('/search.php'),
+    ],
+];
+
+$jsonLd = [];
+if ($q !== '') {
+    $jsonLd = [
+        '@context' => 'https://schema.org',
+        '@type'    => 'SearchResultsPage',
+        'url'      => url('/search.php?q=' . rawurlencode($q)),
+    ];
+}
+
 render_page($q !== '' ? '搜索：' . $q : '搜索', $body, [
     'description' => $q !== '' ? '关于「' . $q . '」的搜索结果' : get_option('site_description', ''),
+    'robots'      => 'noindex,follow',
+    'breadcrumb'  => $crumbs,
+    'json_ld'     => $jsonLd,
 ]);

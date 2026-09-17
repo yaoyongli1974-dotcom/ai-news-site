@@ -34,7 +34,14 @@ if ($cat['description']) $body .= '<p class="muted">' . e($cat['description']) .
 $body .= article_cards($articles);
 $body .= render_pagination($p);
 
+$crumbs = [
+    ['name' => '首页', 'url' => url('/')],
+    ['name' => $cat['name'], 'url' => url('/category.php?slug=' . rawurlencode($cat['slug']))],
+];
+
 render_page($cat['name'], $body, [
     'description' => $cat['description'] ?: get_option('site_description', ''),
     'canonical'   => url('/category.php?slug=' . rawurlencode($cat['slug'])),
+    'breadcrumb'  => $crumbs,
+    'json_ld'     => breadcrumb_ld($crumbs),
 ]);

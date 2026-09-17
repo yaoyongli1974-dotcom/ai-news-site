@@ -38,7 +38,14 @@ $body = '<h1 class="page-title">标签：' . e($tag['name']) . '</h1>';
 $body .= article_cards($articles);
 $body .= render_pagination($p);
 
+$crumbs = [
+    ['name' => '首页', 'url' => url('/')],
+    ['name' => '标签：' . $tag['name'], 'url' => url('/tag.php?slug=' . rawurlencode($tag['slug']))],
+];
+
 render_page('标签：' . $tag['name'], $body, [
     'description' => '标签「' . $tag['name'] . '」下的相关文章',
     'canonical'   => url('/tag.php?slug=' . rawurlencode($tag['slug'])),
+    'breadcrumb'  => $crumbs,
+    'json_ld'     => breadcrumb_ld($crumbs),
 ]);

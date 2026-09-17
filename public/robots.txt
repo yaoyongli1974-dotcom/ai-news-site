@@ -1,0 +1,43 @@
+# ============================================================
+#  AI 搜索引擎 / 聊天机器人友好抓取规则
+#  （ChatGPT、Claude、Bing、Apple、Meta、Perplexity 等）
+# ============================================================
+User-agent: *
+Allow: /
+
+# 后台与接口含写操作/敏感信息，禁止抓取
+Disallow: /admin/
+Disallow: /api/
+
+# 主流 AI 爬虫：明确放行全站前台内容
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: Meta-ExternalFetcher
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+Sitemap: https://ai.xalcy.cn/sitemap.php

@@ -8,7 +8,12 @@
  * 渲染整页。
  * @param string $title   页面标题
  * @param string $body    <main> 内的主体 HTML
- * @param array  $meta    ['description'=>,'keywords'=>,'og_image'=>]
+ * @param array  $meta    [
+ *   'description'=>, 'keywords'=>, 'og_image'=>, 'og_description'=>,
+ *   'canonical'=>, 'og_type'=>, 'robots'=>,
+ *   'breadcrumb'=> [['name','url'], ...] (末项为当前页),
+ *   'json_ld'=> array|array[] (Schema.org 数据块，注入 <head>)
+ * ]
  */
 function render_page(string $title, string $body, array $meta = []): void
 {
@@ -17,7 +22,13 @@ function render_page(string $title, string $body, array $meta = []): void
     $desc = e($meta['description'] ?? get_option('site_description', ''));
     $kw   = e($meta['keywords'] ?? get_option('site_keywords', ''));
     $og   = e($meta['og_image'] ?? '');
-    $canonical = e($meta['canonical'] ?? '');
+    $canonicalRaw = $meta['canonical'] ?? '';
+    $canonical = e($canonicalRaw);
+    $robots   = $meta['robots'] ?? 'index,follow';
+    $ogType   = $meta['og_type'] ?? 'website';
+    $ogDesc   = $meta['og_description'] ?? get_option('site_description', '');
+    $ogUrl    = e($canonicalRaw !== '' ? $canonicalRaw : APP_URL);
+    $breadcrumbHtml = breadcrumb_html($meta['breadcrumb'] ?? []);
     $subtitle = e(get_option('site_subtitle', ''));
     $siteLogo = get_option('site_logo', '');
     $siteIcon = get_option('site_icon', '');
@@ -33,12 +44,63 @@ function render_page(string $title, string $body, array $meta = []): void
   <title><?= e($fullTitle) ?></title>
   <meta name="description" content="<?= $desc ?>">
   <meta name="keywords" content="<?= $kw ?>">
+  <meta name="robots" content="<?= e($robots) ?>">
+  <link rel="canonical" href="<?= $canonical ?>">
+  <meta property="og:type" content="<?= e($ogType) ?>">
   <meta property="og:title" content="<?= e($fullTitle) ?>">
-  <meta property="og:type" content="website">
+  <meta property="og:description" content="<?= e($ogDesc) ?>">
+  <meta property="og:url" content="<?= $ogUrl ?>">
+  <meta property="og:site_name" content="<?= e($siteTitle) ?>">
+  <meta property="og:locale" content="zh_CN">
   <?php if ($og !== ''): ?><meta property="og:image" content="<?= $og ?>"><?php endif; ?>
-  <?php if ($canonical !== ''): ?><link rel="canonical" href="<?= $canonical ?>"><?php endif; ?>
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="<?= e($fullTitle) ?>">
+  <meta name="twitter:description" content="<?= e($ogDesc) ?>">
+  <?php if ($og !== ''): ?><meta name="twitter:image" content="<?= $og ?>"><?php endif; ?>
   <?php if ($siteIcon !== ''): ?><link rel="icon" href="<?= e($siteIcon) ?>"><?php endif; ?>
   <link rel="stylesheet" href="<?= asset('/assets/style.css') ?>">
+  <?php
+    // 全局结构化数据：站点信息 + 站内搜索动作
+    $graph = [
+        '@context' => 'https://schema.org',
+        '@graph'   => [
+            [
+                '@type'       => 'WebSite',
+                'name'        => $siteTitle,
+                'url'         => APP_URL,
+                'description' => get_option('site_description', ''),
+                'inLanguage'  => 'zh-CN',
+                'potentialAction' => [
+                    '@type'       => 'SearchAction',
+                    'target'      => APP_URL . '/search.php?q={search_term_string}',
+                    'query-input' => 'required name=search_term_string',
+                ],
+            ],
+            [
+                '@type' => 'Organization',
+                'name'  => $siteTitle,
+                'url'   => APP_URL,
+            ],
+        ],
+    ];
+    if ($siteLogo !== '') {
+        $graph['@graph'][1]['logo'] = $siteLogo;
+        $graph['@graph'][1]['image'] = $siteLogo;
+    }
+    echo json_ld($graph);
+
+    // 页面级结构化数据（由调用方注入，如 Article / BreadcrumbList）
+    $pgLd = $meta['json_ld'] ?? null;
+    if (is_array($pgLd)) {
+        if (array_is_list($pgLd)) {
+            foreach ($pgLd as $blk) {
+                if (is_array($blk)) echo json_ld($blk);
+            }
+        } else {
+            echo json_ld($pgLd);
+        }
+    }
+    ?>
 </head>
 <body>
   <header class="site-header">
@@ -53,7 +115,7 @@ function render_page(string $title, string $body, array $meta = []): void
         <button type="submit">搜索</button>
       </form>
     </div>
-    <nav class="site-nav">
+    <nav class="site-nav" aria-label="主导航">
       <div class="container">
         <a href="<?= url('/') ?>">首页</a>
         <?php foreach (get_categories() as $c): ?>
@@ -65,6 +127,7 @@ function render_page(string $title, string $body, array $meta = []): void
 
   <main class="container main-grid">
     <div class="content">
+      <?= $breadcrumbHtml ?>
       <?= $body ?>
     </div>
     <?= sidebar_html() ?>
@@ -120,11 +183,14 @@ function article_cards(array $articles): string
         $link = url('/article.php?slug=' . rawurlencode($a['slug']));
         $cover = $a['cover_image'] ? '<img class="post-cover" src="' . attr($a['cover_image']) . '" alt="' . attr($a['title']) . '" loading="lazy">' : '';
         $cat = $a['category_name'] ? '<a class="post-cat" href="' . url('/category.php?slug=' . rawurlencode($a['category_slug'])) . '">' . e($a['category_name']) . '</a>' : '';
+        $dateRaw = $a['published_at'] ?? $a['created_at'] ?? '';
+        $iso = iso8601($dateRaw);
+        $timeHtml = $iso !== '' ? '<time datetime="' . attr($iso) . '" pubdate>' . e(time_ago($dateRaw)) . '</time>' : '<span>' . e(time_ago($dateRaw)) . '</span>';
         $html .= '<article class="post-card">'
             . $cover
             . '<div class="post-body">'
             . '<h2 class="post-title"><a href="' . $link . '">' . e($a['title']) . '</a></h2>'
-            . '<div class="post-meta">' . $cat . '<span>' . e($a['author'] ?: '佚名') . '</span><span>' . e(time_ago($a['published_at'] ?? $a['created_at'])) . '</span><span>' . (int)$a['views'] . ' 阅读</span></div>'
+            . '<div class="post-meta">' . $cat . '<span>' . e($a['author'] ?: '佚名') . '</span>' . $timeHtml . '<span>' . (int)$a['views'] . ' 阅读</span></div>'
             . '<p class="post-summary">' . e($a['summary'] ?: make_excerpt($a['content'], 140)) . '</p>'
             . '</div></article>';
     }

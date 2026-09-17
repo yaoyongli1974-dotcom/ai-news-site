@@ -41,6 +41,15 @@ a:hover { text-decoration: underline; }
 .site-nav a { color: var(--text); font-size: 14px; padding: 6px 2px; }
 .site-nav a:hover { color: var(--primary); text-decoration: none; }
 
+/* Breadcrumb */
+.breadcrumb { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+.breadcrumb ol { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 0; align-items: center; }
+.breadcrumb li { display: inline-flex; align-items: center; }
+.breadcrumb li:not(:last-child)::after { content: "›"; margin: 0 6px; color: var(--border); }
+.breadcrumb a { color: var(--muted); }
+.breadcrumb a:hover { color: var(--primary); text-decoration: none; }
+.breadcrumb [aria-current="page"] { color: var(--text); font-weight: 600; }
+
 /* Layout */
 .main-grid { display: grid; grid-template-columns: 1fr 300px; gap: 28px; padding-top: 26px; padding-bottom: 40px; align-items: start; }
 @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
