@@ -142,3 +142,19 @@ a:hover { text-decoration: underline; }
 /* Footer */
 .site-footer { background: var(--surface); border-top: 1px solid var(--border); padding: 24px 0; margin-top: 20px; text-align: center; color: var(--muted); font-size: 13px; }
 .site-footer .icp { color: var(--muted); }
+
+/* ===== 专题模块 ===== */
+.topic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+.topic-card { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); transition: transform .15s ease; color: var(--text); }
+.topic-card:hover { transform: translateY(-2px); text-decoration: none; }
+.topic-cover { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #eef1f6; display: block; }
+.topic-cover--empty { background: linear-gradient(135deg, #eef2ff, #e6f7f1); }
+.topic-body { padding: 16px; min-width: 0; }
+.topic-title { font-size: 18px; margin: 0 0 8px; line-height: 1.4; color: var(--text); }
+.topic-title a { color: var(--text); }
+.topic-summary { margin: 0 0 12px; color: #3b4252; font-size: 14px; }
+.topic-count { font-size: 13px; color: var(--accent); font-weight: 600; }
+.topic-lead { color: #3b4252; font-size: 15px; margin: 0 0 14px; }
+.topic-stat { margin-top: 14px; }
+.topic-detail .post-cover-lg { margin-top: 4px; }
+@media (max-width: 560px) { .topic-grid { grid-template-columns: 1fr; } }

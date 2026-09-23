@@ -6,6 +6,10 @@ require_once __DIR__ . '/../src/bootstrap.php';
 require_once SRC_DIR . '/view.php';
 
 $q = trim($_GET['q'] ?? '');
+
+// 伪静态开启时，旧链接 /search.php?q= 301 到 /search?q=（__pu 标记避免与重写互跳成环）
+canonicalize_to_pretty(search_url($q));
+
 $page = max(1, (int)($_GET['page'] ?? 1));
 $per  = posts_per_page();
 
@@ -44,7 +48,7 @@ $crumbs = [
     ['name' => '首页', 'url' => url('/')],
     [
         'name' => $q !== '' ? '搜索：' . $q : '搜索',
-        'url'  => $q !== '' ? url('/search.php?q=' . rawurlencode($q)) : url('/search.php'),
+        'url'  => search_url($q),
     ],
 ];
 
@@ -53,7 +57,7 @@ if ($q !== '') {
     $jsonLd = [
         '@context' => 'https://schema.org',
         '@type'    => 'SearchResultsPage',
-        'url'      => url('/search.php?q=' . rawurlencode($q)),
+        'url'      => search_url($q),
     ];
 }
 

@@ -15,6 +15,17 @@ RewriteEngine On
     Require all denied
 </FilesMatch>
 
+# ---- 伪静态（漂亮 URL）重写：开启后台"启用伪静态"后生效 ----
+# 重写始终启用；是否输出漂亮链接由后台 enable_pretty_url 决定（应用层控制）。
+# 末尾 &__pu=1 标记供 PHP 区分"重写后的漂亮请求"与"直接访问的旧链接(.php)"，避免 301 规范化互跳成环。
+# [QSA] 自动保留原查询串（分页 ?page= / 搜索 ?q= 等）。
+RewriteRule ^article/([^/]+)/?$ article.php?slug=$1&__pu=1 [QSA,L]
+RewriteRule ^category/([^/]+)/?$ category.php?slug=$1&__pu=1 [QSA,L]
+RewriteRule ^tag/([^/]+)/?$ tag.php?slug=$1&__pu=1 [QSA,L]
+RewriteRule ^search/?$ search.php?__pu=1 [QSA,L]
+RewriteRule ^topics/?$ topics.php?__pu=1 [QSA,L]
+RewriteRule ^topic/([^/]+)/?$ topic.php?slug=$1&__pu=1 [QSA,L]
+
 # 若请求的不是真实文件/目录，交由 index.php 处理(当前站点采用文件型 URL，此项可选)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

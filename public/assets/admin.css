@@ -70,6 +70,9 @@ table.tbl tr:hover td { background: #fafbff; }
 .form-row .chk { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 400; }
 .form-row input[type=file] { font-size: 13px; }
 
+/* 专题关联文章多选框 */
+.topic-article-select { min-height: 240px; width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; background: var(--surface); }
+
 .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
 .stat-card { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
 .stat-card .num { font-size: 26px; font-weight: 800; }

@@ -2,6 +2,17 @@
 # 前提: 已启用 mod_rewrite；DocumentRoot 指向 public/
 RewriteEngine On
 
+# ---- 伪静态（漂亮 URL）重写：开启后台"启用伪静态"后生效 ----
+# 重写始终启用；是否输出漂亮链接由后台 enable_pretty_url 决定（应用层控制）。
+# 末尾 &__pu=1 标记供 PHP 区分"重写后的漂亮请求"与"直接访问的旧链接(.php)"，避免 301 规范化互跳成环。
+# [QSA] 自动保留原查询串（分页 ?page= / 搜索 ?q= 等）。
+RewriteRule ^article/([^/]+)/?$ article.php?slug=$1&__pu=1 [QSA,L]
+RewriteRule ^category/([^/]+)/?$ category.php?slug=$1&__pu=1 [QSA,L]
+RewriteRule ^tag/([^/]+)/?$ tag.php?slug=$1&__pu=1 [QSA,L]
+RewriteRule ^search/?$ search.php?__pu=1 [QSA,L]
+RewriteRule ^topics/?$ topics.php?__pu=1 [QSA,L]
+RewriteRule ^topic/([^/]+)/?$ topic.php?slug=$1&__pu=1 [QSA,L]
+
 # 阻止访问隐藏文件与敏感后缀
 <FilesMatch "^\.">
     Require all denied

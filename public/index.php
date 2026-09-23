@@ -31,7 +31,7 @@ foreach ($articles as $i => $a) {
     $listEls[] = [
         '@type'    => 'ListItem',
         'position' => $i + 1,
-        'url'      => url('/article.php?slug=' . rawurlencode($a['slug'])),
+        'url'      => article_url($a['slug']),
         'name'     => $a['title'],
     ];
 }

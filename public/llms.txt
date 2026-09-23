@@ -10,7 +10,7 @@ AI 资讯汇是一个聚合展示人工智能（AI）领域微信公众号文章
 
 ## 栏目导航
 - 首页（最新文章）：https://ai.xalcy.cn/
-- 站内搜索：https://ai.xalcy.cn/search.php?q=关键词
+- 站内搜索：https://ai.xalcy.cn/search?q=关键词
 - 分类与标签页：见首页主导航或站点地图
 
 ## 给 AI 抓取者的说明

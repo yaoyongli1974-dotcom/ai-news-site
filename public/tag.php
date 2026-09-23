@@ -13,6 +13,9 @@ if (!$tag) {
     exit;
 }
 
+// 伪静态开启时，旧链接(.php?slug=) 301 到漂亮 URL
+canonicalize_to_pretty(tag_url($tag['slug']));
+
 $page = max(1, (int)($_GET['page'] ?? 1));
 $per  = posts_per_page();
 $total = (int)db_fetch(
@@ -40,12 +43,12 @@ $body .= render_pagination($p);
 
 $crumbs = [
     ['name' => '首页', 'url' => url('/')],
-    ['name' => '标签：' . $tag['name'], 'url' => url('/tag.php?slug=' . rawurlencode($tag['slug']))],
+    ['name' => '标签：' . $tag['name'], 'url' => tag_url($tag['slug'])],
 ];
 
 render_page('标签：' . $tag['name'], $body, [
     'description' => '标签「' . $tag['name'] . '」下的相关文章',
-    'canonical'   => url('/tag.php?slug=' . rawurlencode($tag['slug'])),
+    'canonical'   => tag_url($tag['slug']),
     'breadcrumb'  => $crumbs,
     'json_ld'     => breadcrumb_ld($crumbs),
 ]);

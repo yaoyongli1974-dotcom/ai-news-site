@@ -31,6 +31,7 @@ function admin_layout(string $title, string $body, string $active = ''): void
         'uploads'    => ['label' => '媒体库',   'href' => '/admin/uploads.php'],
         'categories' => ['label' => '分类管理', 'href' => '/admin/categories.php'],
         'tags'       => ['label' => '标签管理', 'href' => '/admin/tags.php'],
+        'topics'     => ['label' => '专题管理', 'href' => '/admin/topics.php'],
         'settings'   => ['label' => '站点配置', 'href' => '/admin/settings.php'],
         'tokens'     => ['label' => '接口令牌', 'href' => '/admin/api_tokens.php'],
     ];

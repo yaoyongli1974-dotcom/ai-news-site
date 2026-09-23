@@ -45,7 +45,7 @@ $articles = db_fetch_all(
 $rows = '';
 foreach ($articles as $r) {
     $rows .= '<tr>'
-        . '<td><a href="' . url('/article.php?slug=' . rawurlencode($r['slug'])) . '" target="_blank">' . e($r['title']) . '</a></td>'
+        . '<td><a href="' . article_url($r['slug']) . '" target="_blank">' . e($r['title']) . '</a></td>'
         . '<td>' . e($r['category_name'] ?: '—') . '</td>'
         . '<td><span class="badge ' . ($r['status']==='published'?'badge-pub':'badge-draft') . '">' . e($r['status']==='published'?'已发布':'草稿') . '</span></td>'
         . '<td>' . (int)$r['views'] . '</td>'

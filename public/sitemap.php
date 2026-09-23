@@ -17,7 +17,17 @@ $urls[] = ['loc' => $base . '/', 'changefreq' => 'daily', 'priority' => '1.0'];
 $cats = db_fetch_all("SELECT `slug` FROM `categories` ORDER BY `id` ASC");
 foreach ($cats as $c) {
     $urls[] = [
-        'loc'       => $base . '/category.php?slug=' . rawurlencode($c['slug']),
+        'loc'       => category_url($c['slug']),
+        'changefreq' => 'daily',
+        'priority'  => '0.7',
+    ];
+}
+
+// 专题页（仅已发布）
+$topics = db_fetch_all("SELECT `slug` FROM `topics` WHERE `status`='published' ORDER BY `id` ASC");
+foreach ($topics as $t) {
+    $urls[] = [
+        'loc'       => topic_url($t['slug']),
         'changefreq' => 'daily',
         'priority'  => '0.7',
     ];
@@ -30,7 +40,7 @@ $arts = db_fetch_all(
 );
 foreach ($arts as $a) {
     $urls[] = [
-        'loc'       => $base . '/article.php?slug=' . rawurlencode($a['slug']),
+        'loc'       => article_url($a['slug']),
         'lastmod'   => iso8601($a['dt']),
         'changefreq' => 'weekly',
         'priority'  => '0.8',

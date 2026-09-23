@@ -72,7 +72,7 @@ function render_page(string $title, string $body, array $meta = []): void
                 'inLanguage'  => 'zh-CN',
                 'potentialAction' => [
                     '@type'       => 'SearchAction',
-                    'target'      => APP_URL . '/search.php?q={search_term_string}',
+                    'target'      => APP_URL . (pretty_url_enabled() ? '/search?q={search_term_string}' : '/search.php?q={search_term_string}'),
                     'query-input' => 'required name=search_term_string',
                 ],
             ],
@@ -110,7 +110,7 @@ function render_page(string $title, string $body, array $meta = []): void
         <?php endif; ?><?= e($siteTitle) ?>
       </a>
       <span class="brand-sub"><?= $subtitle ?></span>
-      <form class="search-box" action="<?= url('/search.php') ?>" method="get" role="search">
+      <form class="search-box" action="<?= search_url() ?>" method="get" role="search">
         <input type="search" name="q" placeholder="搜索文章…" value="<?= e($_GET['q'] ?? '') ?>" aria-label="搜索">
         <button type="submit">搜索</button>
       </form>
@@ -119,8 +119,9 @@ function render_page(string $title, string $body, array $meta = []): void
       <div class="container">
         <a href="<?= url('/') ?>">首页</a>
         <?php foreach (get_categories() as $c): ?>
-          <a href="<?= url('/category.php?slug=' . rawurlencode($c['slug'])) ?>"><?= e($c['name']) ?></a>
+          <a href="<?= category_url($c['slug']) ?>"><?= e($c['name']) ?></a>
         <?php endforeach; ?>
+        <a href="<?= topics_url() ?>">专题</a>
       </div>
     </nav>
   </header>
@@ -152,14 +153,14 @@ function sidebar_html(): string
 
     $html .= '<section class="widget"><h3>分类</h3><ul class="cat-list">';
     foreach ($cats as $c) {
-        $html .= '<li><a href="' . url('/category.php?slug=' . rawurlencode($c['slug'])) . '">' . e($c['name']) . '</a></li>';
+        $html .= '<li><a href="' . category_url($c['slug']) . '">' . e($c['name']) . '</a></li>';
     }
     $html .= '</ul></section>';
 
     if ($tags) {
         $html .= '<section class="widget"><h3>热门标签</h3><div class="tag-cloud">';
         foreach ($tags as $t) {
-            $html .= '<a class="tag" href="' . url('/tag.php?slug=' . rawurlencode($t['slug'])) . '">' . e($t['name']) . '</a>';
+            $html .= '<a class="tag" href="' . tag_url($t['slug']) . '">' . e($t['name']) . '</a>';
         }
         $html .= '</div></section>';
     }
@@ -180,9 +181,9 @@ function article_cards(array $articles): string
     }
     $html = '<div class="post-list">';
     foreach ($articles as $a) {
-        $link = url('/article.php?slug=' . rawurlencode($a['slug']));
+        $link = article_url($a['slug']);
         $cover = $a['cover_image'] ? '<img class="post-cover" src="' . attr($a['cover_image']) . '" alt="' . attr($a['title']) . '" loading="lazy">' : '';
-        $cat = $a['category_name'] ? '<a class="post-cat" href="' . url('/category.php?slug=' . rawurlencode($a['category_slug'])) . '">' . e($a['category_name']) . '</a>' : '';
+        $cat = $a['category_name'] ? '<a class="post-cat" href="' . category_url($a['category_slug']) . '">' . e($a['category_name']) . '</a>' : '';
         $dateRaw = $a['published_at'] ?? $a['created_at'] ?? '';
         $iso = iso8601($dateRaw);
         $timeHtml = $iso !== '' ? '<time datetime="' . attr($iso) . '" pubdate>' . e(time_ago($dateRaw)) . '</time>' : '<span>' . e(time_ago($dateRaw)) . '</span>';

@@ -13,6 +13,9 @@ if (!$cat) {
     exit;
 }
 
+// 伪静态开启时，旧链接(.php?slug=) 301 到漂亮 URL
+canonicalize_to_pretty(category_url($cat['slug']));
+
 $page = max(1, (int)($_GET['page'] ?? 1));
 $per  = posts_per_page();
 $p = paginate(
@@ -36,12 +39,12 @@ $body .= render_pagination($p);
 
 $crumbs = [
     ['name' => '首页', 'url' => url('/')],
-    ['name' => $cat['name'], 'url' => url('/category.php?slug=' . rawurlencode($cat['slug']))],
+    ['name' => $cat['name'], 'url' => category_url($cat['slug'])],
 ];
 
 render_page($cat['name'], $body, [
     'description' => $cat['description'] ?: get_option('site_description', ''),
-    'canonical'   => url('/category.php?slug=' . rawurlencode($cat['slug'])),
+    'canonical'   => category_url($cat['slug']),
     'breadcrumb'  => $crumbs,
     'json_ld'     => breadcrumb_ld($crumbs),
 ]);

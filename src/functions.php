@@ -52,6 +52,91 @@ function redirect(string $location, int $code = 302): void
     exit;
 }
 
+// ---------------- 伪静态 / 漂亮 URL ----------------
+/**
+ * 是否启用伪静态（漂亮 URL）。由后台"启用伪静态"开关控制（options 表 enable_pretty_url）。
+ * 开启后出站链接变为 /article/<slug> 等形态，需服务器部署对应重写规则。
+ */
+function pretty_url_enabled(): bool
+{
+    return get_option('enable_pretty_url', '0') === '1';
+}
+
+/** 文章 URL：伪静态返回 /article/<slug>，否则 /article.php?slug=<slug> */
+function article_url(string $slug): string
+{
+    return pretty_url_enabled()
+        ? url('/article/' . rawurlencode($slug))
+        : url('/article.php?slug=' . rawurlencode($slug));
+}
+
+/** 分类 URL */
+function category_url(string $slug): string
+{
+    return pretty_url_enabled()
+        ? url('/category/' . rawurlencode($slug))
+        : url('/category.php?slug=' . rawurlencode($slug));
+}
+
+/** 标签 URL */
+function tag_url(string $slug): string
+{
+    return pretty_url_enabled()
+        ? url('/tag/' . rawurlencode($slug))
+        : url('/tag.php?slug=' . rawurlencode($slug));
+}
+
+/** 搜索 URL：伪静态仅去掉 .php，查询词仍以 ?q= 传递 */
+function search_url(string $q = ''): string
+{
+    $q = trim($q);
+    $base = pretty_url_enabled() ? '/search' : '/search.php';
+    if ($q === '') {
+        return url($base);
+    }
+    return url($base . '?q=' . rawurlencode($q));
+}
+
+/** 专题列表 URL：/topics 或 /topics.php */
+function topics_url(): string
+{
+    return pretty_url_enabled() ? url('/topics') : url('/topics.php');
+}
+
+/** 专题 URL：伪静态返回 /topic/<slug>，否则 /topic.php?slug=<slug> */
+function topic_url(string $slug): string
+{
+    return pretty_url_enabled()
+        ? url('/topic/' . rawurlencode($slug))
+        : url('/topic.php?slug=' . rawurlencode($slug));
+}
+
+// ---------------- 旧链 301 规范化 ----------------
+/**
+ * 伪静态开启时，将"直接访问的旧链接"(.php?slug= / .php?q= / .php) 301 跳转到漂亮 URL，
+ * 集中权重、避免重复内容。
+ *
+ * 重写规则在内部重写时会注入 __pu=1 标记。据此可区分两种到达 .php 脚本的情形：
+ *   1) 经重写规则进来的漂亮请求（/article/<slug> -> article.php?...&__pu=1）：不跳转；
+ *   2) 用户/爬虫直接访问旧链接（/article.php?slug=<slug>）：跳转。
+ * 如此在 Nginx 与 Apache 下都不会与重写形成重定向环。
+ *
+ * @param string $prettyUrl 目标漂亮 URL（由 article_url()/category_url() 等生成）
+ */
+function canonicalize_to_pretty(string $prettyUrl): void
+{
+    if (!pretty_url_enabled()) {
+        return;
+    }
+    if (isset($_GET['__pu'])) {
+        return;
+    }
+    if (isset($_SERVER['REQUEST_URI'])
+        && strpos((string)$_SERVER['REQUEST_URI'], '.php') !== false) {
+        redirect($prettyUrl, 301);
+    }
+}
+
 // ---------------- slug ----------------
 /**
  * 生成 URL 友好的 slug。中文会被转写为拼音？(保持简单)这里仅做安全过滤：
@@ -182,24 +267,34 @@ function paginate(int $total, int $per_page, int $page): array
 function render_pagination(array $p, string $base_query = ''): string
 {
     if ($p['total_pages'] <= 1) return '';
+    // 基础路径取当前请求路径（去掉查询串），使伪静态下分页链接形态正确（/category/x?page=2）
+    $path = strtok((string)($_SERVER['REQUEST_URI'] ?? '/'), '?');
+    if ($path === '' || $path === false) {
+        $path = '/';
+    }
     $qs = $_GET;
     unset($qs['page']);
+    // 伪静态下路由参数(slug/id)已写入路径，分页仅保留其他数量型 query
+    if (pretty_url_enabled()) {
+        unset($qs['slug'], $qs['id']);
+    }
     $extra = $base_query !== '' ? '&' . ltrim($base_query, '&') : '';
-    $base = '?' . http_build_query($qs) . $extra;
-    if ($base === '?') $base = '?';
-    $base .= '&';
+    $qstr = http_build_query($qs);
+    $sep = ($qstr !== '' || $extra !== '') ? '?' : '';
+    $base = $path . $sep . $qstr . $extra;
+    $base .= (strpos($base, '?') === false ? '?' : '&') . 'page=';
     $html = '<nav class="pagination" aria-label="分页">';
     if ($p['page'] > 1) {
-        $html .= '<a href="' . attr($base . '&page=' . ($p['page'] - 1)) . '">« 上一页</a>';
+        $html .= '<a href="' . attr($base . ($p['page'] - 1)) . '">« 上一页</a>';
     }
     $start = max(1, $p['page'] - 2);
     $end = min($p['total_pages'], $p['page'] + 2);
     for ($i = $start; $i <= $end; $i++) {
         $active = $i === $p['page'] ? ' class="active"' : '';
-        $html .= '<a' . $active . ' href="' . attr($base . '&page=' . $i) . '">' . $i . '</a>';
+        $html .= '<a' . $active . ' href="' . attr($base . $i) . '">' . $i . '</a>';
     }
     if ($p['page'] < $p['total_pages']) {
-        $html .= '<a href="' . attr($base . '&page=' . ($p['page'] + 1)) . '">下一页 »</a>';
+        $html .= '<a href="' . attr($base . ($p['page'] + 1)) . '">下一页 »</a>';
     }
     $html .= '</nav>';
     return $html;

@@ -26,8 +26,9 @@ _tmp/
 *.bak
 *.tmp
 
-# 升级包（本地部署用，不随代码分发）
+# 升级包 / 热修复包（本地部署用，不随代码分发）
 upgrade-*.zip
+hotfix-*.zip
 
 # Windows / macOS
 Thumbs.db

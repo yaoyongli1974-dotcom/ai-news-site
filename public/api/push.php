@@ -86,7 +86,7 @@ foreach ($articles as $i => $item) {
             'id'      => $res['id'],
             'action'  => $res['action'],
             'slug'    => $res['slug'],
-            'url'     => url('/article.php?slug=' . rawurlencode($res['slug'])),
+            'url'     => article_url($res['slug']),
         ];
     } catch (Throwable $e) {
         $errors[] = ['index' => $i, 'error' => $e->getMessage(), 'title' => $item['title'] ?? null];

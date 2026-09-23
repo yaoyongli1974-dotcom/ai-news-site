@@ -69,7 +69,10 @@ function save_article(array $data): array
     if ($content === '') throw new InvalidArgumentException('content 不能为空');
 
     $id         = isset($data['id']) ? (int)$data['id'] : 0;
-    $slug       = slugify((string)($data['slug'] ?? ''), 200);
+    $rawSlug    = trim((string)($data['slug'] ?? ''));
+    // 空 slug 传空串，交给 unique_slug 生成 article / article-2… 基准；
+    // 避免 slugify 的 'item' 默认值导致新建时拿到相同 slug 而误判为更新、覆盖历史文章。
+    $slug       = $rawSlug === '' ? '' : slugify($rawSlug, 200);
     $summary    = (string)($data['summary'] ?? '');
     if ($summary === '') $summary = make_excerpt($content, 200);
     $cover      = (string)($data['cover_image'] ?? '');
@@ -91,10 +94,8 @@ function save_article(array $data): array
         $row = db_fetch("SELECT `id` FROM `articles` WHERE `source_id`=?", [$sourceId]);
         if ($row) $existingId = (int)$row['id'];
     }
-    if ($existingId === 0 && $slug !== '') {
-        $row = db_fetch("SELECT `id` FROM `articles` WHERE `slug`=?", [$slug]);
-        if ($row) $existingId = (int)$row['id'];
-    }
+    // 注意：新增(id=0)不再按 slug 反查已存在行——否则空 slug（slugify 默认 'item'）/
+    // 重复 slug 会被误判为"更新"而覆盖历史文章。slug 唯一性由 unique_slug() 在插入时保证。
 
     if ($existingId > 0) {
         // 更新：slug 仅在显式提供且不与他者冲突时更新

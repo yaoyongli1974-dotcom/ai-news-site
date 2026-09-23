@@ -22,6 +22,14 @@ $textFields = [
     'site_icp'       => ['label' => 'ICP 备案号',      'type' => 'text'],
 ];
 
+// ---- 布尔开关（下拉：开启/关闭）----
+$boolFields = [
+    'enable_pretty_url' => [
+        'label' => '启用伪静态（漂亮 URL）',
+        'hint'  => '开启后前台链接变为 /article/标题、/category/分类、/tag/标签、/search 等形态，旧链接自动 301 跳转。需服务器已部署对应重写规则（见 deploy/nginx.conf 或 apache.htaccess）；关闭则恢复 article.php?slug= 动态链接。',
+    ],
+];
+
 // ---- 品牌图字段（URL 可手填外链，也可上传覆盖）----
 $brandFields = [
     'site_logo' => ['label' => '站点 LOGO', 'hint' => '建议 PNG（透明背景）或 JPG，高度 ≤ 64px 观感最佳。可粘贴外链，或上传本地图片。'],
@@ -66,6 +74,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // 三者皆无：保留原值
             }
 
+            // 3) 布尔开关（伪静态）
+            foreach ($boolFields as $key => $def) {
+                set_option($key, !empty($_POST[$key]) ? '1' : '0');
+            }
+
             set_flash('站点配置已保存，已即时生效', 'ok');
             redirect(url('/admin/settings.php'));
         } catch (RuntimeException $ex) {
@@ -81,6 +94,9 @@ foreach ($textFields as $key => $def) {
 }
 foreach ($brandFields as $key => $def) {
     $values[$key] = (string)($_POST[$key] ?? get_option($key, ''));
+}
+foreach ($boolFields as $key => $def) {
+    $values[$key] = (string)($_POST[$key] ?? get_option($key, '0'));
 }
 
 // ---- 渲染 ----
@@ -115,6 +131,21 @@ foreach (['footer_text', 'site_icp'] as $k) {
     $body .= '<div class="form-row">'
         . '<label for="' . $k . '">' . e($def['label']) . '</label>'
         . '<input type="text" id="' . $k . '" name="' . $k . '" value="' . attr($values[$k]) . '">'
+        . '</div>';
+}
+$body .= '</div></fieldset>';
+
+// 分组：URL 与伪静态
+$body .= '<fieldset class="set-group"><legend>URL 与伪静态</legend><div class="form-grid">';
+foreach ($boolFields as $k => $def) {
+    $cur = $values[$k] ?? '0';
+    $body .= '<div class="form-row">'
+        . '<label for="' . $k . '">' . e($def['label']) . '</label>'
+        . '<select id="' . $k . '" name="' . $k . '">'
+        . '<option value="1"' . ($cur === '1' ? ' selected' : '') . '>开启</option>'
+        . '<option value="0"' . ($cur === '0' ? ' selected' : '') . '>关闭</option>'
+        . '</select>'
+        . '<p class="hint">' . e($def['hint']) . '</p>'
         . '</div>';
 }
 $body .= '</div></fieldset>';

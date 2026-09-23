@@ -22,6 +22,9 @@ if (!$article) {
     exit;
 }
 
+// 伪静态开启时，旧链接(.php?slug= / ?id=)统一 301 到漂亮 URL（重写规则注入 __pu 标记，避免与重写互跳成环）
+canonicalize_to_pretty(article_url($article['slug']));
+
 // 阅读量 +1
 db_exec("UPDATE `articles` SET `views`=`views`+1 WHERE `id`=?", [$article['id']]);
 $article['views'] = (int)$article['views'] + 1;
@@ -35,7 +38,7 @@ $related = related_articles((int)$article['id'], (int)($article['category_id'] ?
 $dateRaw = $article['published_at'] ?? $article['created_at'];
 
 $catHtml = $category
-    ? '<a href="' . url('/category.php?slug=' . rawurlencode($category['slug'])) . '">' . e($category['name']) . '</a>'
+    ? '<a href="' . category_url($category['slug']) . '">' . e($category['name']) . '</a>'
     : '<span>未分类</span>';
 
 $tagHtml = '';
@@ -43,7 +46,7 @@ foreach ($tags as $t) {
     $slugT = slugify($t['name']);
     // 标签 slug 可能在库里，这里用名称 slugify 兜底
     $tagRow = get_tag_by_slug($slugT);
-    $href = $tagRow ? url('/tag.php?slug=' . rawurlencode($tagRow['slug'])) : url('/search.php?q=' . rawurlencode($t['name']));
+    $href = $tagRow ? tag_url($tagRow['slug']) : search_url($t['name']);
     $tagHtml .= '<a class="tag" href="' . $href . '">' . e($t['name']) . '</a>';
 }
 
@@ -69,7 +72,7 @@ if ($related) {
     $body .= '<section class="related"><h3>相关推荐</h3>' . article_cards($related) . '</section>';
 }
 
-$canonical = url('/article.php?slug=' . rawurlencode($article['slug']));
+$canonical = article_url($article['slug']);
 $datePublished = iso8601($dateRaw);
 $dateModified  = isset($article['updated_at']) && $article['updated_at'] !== ''
     ? iso8601($article['updated_at'])
@@ -110,7 +113,7 @@ $crumbs = [['name' => '首页', 'url' => url('/')]];
 if ($category) {
     $crumbs[] = [
         'name' => $category['name'],
-        'url'  => url('/category.php?slug=' . rawurlencode($category['slug'])),
+        'url'  => category_url($category['slug']),
     ];
 }
 $crumbs[] = ['name' => $article['title'], 'url' => $canonical];
