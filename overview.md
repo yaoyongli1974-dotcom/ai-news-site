@@ -7,7 +7,7 @@
 
 | 模块 | 文件 | 说明 |
 |------|------|------|
-| 数据库 | `sql/schema.sql` | 8 张表：articles / categories / tags / article_tags / admins / api_tokens / push_logs / options，utf8mb4，含索引、初始分类标签与站点配置 |
+| 数据库 | `sql/schema.sql` | 12 张表：articles / categories / tags / article_tags / admins / api_tokens / push_logs / options / topics / topic_articles / login_attempts / api_nonces，utf8mb4，含索引、初始分类标签与站点配置 |
 | 核心框架 | `src/{bootstrap,db,functions,auth,view,admin_view,article_service,upload_service}.php` | PDO 连接、转义/slug/分页/CSRF、会话鉴权、HMAC 鉴权（推送 + 上传）、前后台布局、文章写服务、图片上传服务 |
 | 前台 | `public/{index,article,category,tag,search}.php` + `assets/style.css` | 列表分页、分类/标签筛选、搜索、详情页（阅读量+相关推荐）、响应式+SEO meta |
 | 后台 | `public/admin/*.php` + `assets/admin.css` | 登录/登出、仪表盘、文章增删改查、**媒体库**、分类/标签管理、推送令牌管理，全程 CSRF 与会话鉴权 |
@@ -78,3 +78,22 @@
    把 `deploy/nginx-uploads-snippet.conf` 贴进站点配置以禁止上传目录执行脚本；确认 `public/assets/uploads` 对 PHP 进程可写。
 5. AI 侧用 `scripts/upload_client.php` 或 README 的 Python 示例上传配图，再用 `push_client.php` / curl 推送文章；
    定时任务可参考 `deploy/crontab.example`。
+
+## 安全加固（2026-11-19）
+
+针对代码审计与线上探测（ai.xalcy.cn）发现的问题，完成一轮整体加固：
+
+| 类别 | 内容 |
+|------|------|
+| 会话 | Cookie 强制 `HttpOnly/Secure/SameSite=Lax`；登录成功 `session_regenerate_id(true)`；空闲超时（默认 30 分钟）；登出彻底销毁会话 |
+| 登录 | 登录表单 CSRF；失败限流锁定（默认 5 次/15 分钟，用户名+IP 双维度，`login_attempts` 表）；用户不存在也走 `password_verify` 均衡耗时 |
+| API | 签名 nonce 一次性防重放（`api_nonces` 表，`api.replay_protection`）；推送批量上限（默认 50）与请求体上限（默认 5MB）；`last_used_at` 移到验签通过后更新 |
+| 响应头 | 全站 CSP / X-Frame-Options（后台 DENY）/ nosniff / Referrer-Policy；移除 X-Powered-By；后台内联脚本外置为 `assets/admin.js` 以兼容 CSP |
+| SEO | 未知路径真 404（`public/404.html` + nginx/apache 配置）；删除静态 `llms.txt`，`/llms.txt` 重写到动态 `llms.php`（与后台站点设置实时一致） |
+| 数据层 | `save_article` 事务化；搜索 FULLTEXT(ngram) 优先、缺索引自动回退 LIKE 并转义 `%/_`；`push_logs` 轮转脚本 `scripts/rotate_push_logs.php` |
+| 兼容 | 修复 PHP 8.4 隐式可空参数 deprecated；`is_https()` 可按 `security.trust_forwarded_proto` 关闭对代理头的信任 |
+| 工程 | `scripts/check_db.php` 表清单同步为 12 张；新增 `tests/`（php -l 全量 + MySQL 冒烟）与 GitHub Actions CI |
+
+**老库升级**：导入 `sql/security_hardening_migration.sql`（必做，幂等）；MySQL 建议再导入 `sql/search_fulltext_migration.sql`。
+**1Panel 部署**：把 `deploy/nginx-uploads-snippet.conf` 新增的「安全加固配套片段」（llms 重写 / 真 404 / X-Forwarded-Proto 覆写）贴进站点配置。
+未导入迁移时功能自动降级（限流/防重放关闭），不影响站点运行。

@@ -44,7 +44,7 @@ function upload_config(): array
  * 上传目录绝对路径；不存在自动创建。
  * @throws RuntimeException 目录无法创建或不可写
  */
-function upload_dir(array $cfg = null): string
+function upload_dir(?array $cfg = null): string
 {
     $cfg = $cfg ?? upload_config();
     $dir = rtrim(PUBLIC_DIR, '/\\') . '/' . trim((string)$cfg['dir'], '/\\');
@@ -126,7 +126,7 @@ function upload_detect_mime(string $path): string
  * 文件名主干安全化：只保留 [A-Za-z0-9-_]，中文等非 ASCII 会被剔除。
  * 为空时用「日期-随机」兜底。
  */
-function upload_safe_stem(string $name, array $cfg = null): string
+function upload_safe_stem(string $name, ?array $cfg = null): string
 {
     $cfg  = $cfg ?? upload_config();
     $name = trim($name);

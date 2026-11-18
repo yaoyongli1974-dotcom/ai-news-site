@@ -10,4 +10,7 @@
 # 每晚 21 点：补推一次
 0 21 * * * /usr/bin/php /var/www/ai.xalcy.cn/scripts/push_client.php /data/wx_articles/today.json >> /var/log/ai_xalcy_push.log 2>&1
 
+# 每天凌晨 3:30：轮转清理推送审计日志（默认保留 90 天，见 config.php api.log_retention_days）
+30 3 * * * /usr/bin/php /var/www/ai.xalcy.cn/scripts/rotate_push_logs.php >> /var/log/ai_xalcy_rotate.log 2>&1
+
 # 提示: 也可由 AI 自身调度(不依赖系统 cron)，直接调用 HTTPS 接口即可。

@@ -16,21 +16,48 @@ $per  = posts_per_page();
 $articles = [];
 $total = 0;
 if ($q !== '') {
-    $like = '%' . $q . '%';
-    $total = (int)db_fetch(
-        "SELECT COUNT(*) AS c FROM `articles`
-         WHERE `status`='published' AND (`title` LIKE ? OR `summary` LIKE ? OR `content` LIKE ?)",
-        [$like, $like, $like]
-    )['c'];
-    $p = paginate($total, $per, $page);
-    $articles = db_fetch_all(
-        "SELECT a.*, c.`name` AS category_name, c.`slug` AS category_slug
-         FROM `articles` a LEFT JOIN `categories` c ON c.`id`=a.`category_id`
-         WHERE a.`status`='published' AND (a.`title` LIKE ? OR a.`summary` LIKE ? OR a.`content` LIKE ?)
-         ORDER BY COALESCE(a.`published_at`, a.`created_at`) DESC, a.`id` DESC
-         LIMIT ? OFFSET ?",
-        [$like, $like, $like, $p['per_page'], $p['offset']]
-    );
+    // 优先 FULLTEXT（ngram 分词，支持中文，见 sql/search_fulltext_migration.sql）；
+    // 索引不存在（MariaDB 或未跑迁移）时自动回退 LIKE。
+    $useFulltext = false;
+    try {
+        $useFulltext = !empty(db_fetch_all("SHOW INDEX FROM `articles` WHERE `Key_name`='ft_search'"));
+    } catch (PDOException $e) {
+        $useFulltext = false;
+    }
+
+    if ($useFulltext) {
+        $match = "MATCH(a.`title`, a.`summary`, a.`content`) AGAINST (? IN NATURAL LANGUAGE MODE)";
+        $total = (int)db_fetch(
+            "SELECT COUNT(*) AS c FROM `articles` a WHERE a.`status`='published' AND {$match}",
+            [$q]
+        )['c'];
+        $p = paginate($total, $per, $page);
+        $articles = db_fetch_all(
+            "SELECT a.*, c.`name` AS category_name, c.`slug` AS category_slug
+             FROM `articles` a LEFT JOIN `categories` c ON c.`id`=a.`category_id`
+             WHERE a.`status`='published' AND {$match}
+             ORDER BY COALESCE(a.`published_at`, a.`created_at`) DESC, a.`id` DESC
+             LIMIT ? OFFSET ?",
+            [$q, $p['per_page'], $p['offset']]
+        );
+    } else {
+        // 转义 LIKE 通配符，避免用户输入中的 %/_ 扩大匹配范围
+        $like = '%' . addcslashes($q, '%_\\') . '%';
+        $total = (int)db_fetch(
+            "SELECT COUNT(*) AS c FROM `articles`
+             WHERE `status`='published' AND (`title` LIKE ? ESCAPE '\\\\' OR `summary` LIKE ? ESCAPE '\\\\' OR `content` LIKE ? ESCAPE '\\\\')",
+            [$like, $like, $like]
+        )['c'];
+        $p = paginate($total, $per, $page);
+        $articles = db_fetch_all(
+            "SELECT a.*, c.`name` AS category_name, c.`slug` AS category_slug
+             FROM `articles` a LEFT JOIN `categories` c ON c.`id`=a.`category_id`
+             WHERE a.`status`='published' AND (a.`title` LIKE ? ESCAPE '\\\\' OR a.`summary` LIKE ? ESCAPE '\\\\' OR a.`content` LIKE ? ESCAPE '\\\\')
+             ORDER BY COALESCE(a.`published_at`, a.`created_at`) DESC, a.`id` DESC
+             LIMIT ? OFFSET ?",
+            [$like, $like, $like, $p['per_page'], $p['offset']]
+        );
+    }
 } else {
     $p = paginate(0, $per, 1);
 }

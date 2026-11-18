@@ -41,6 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     api_json(405, ['error' => 'method_not_allowed', 'message' => '请使用 POST 推送文章']);
 }
 
+// 请求体体积上限(先于鉴权检查，低成本挡住超大载荷)
+$cfgApi  = $GLOBALS['APP_CONFIG']['api'] ?? [];
+$maxBody = (int)($cfgApi['max_body_bytes'] ?? 5 * 1024 * 1024);
+if ($maxBody > 0 && strlen($rawBody) > $maxBody) {
+    api_json(413, ['error' => 'body_too_large', 'message' => "请求体超过上限({$maxBody} 字节)，请分批推送"]);
+}
+
 // 鉴权(失败会直接输出 401/403 并 exit)
 $token = api_require_auth($rawBody);
 
@@ -64,6 +71,13 @@ if (isset($data['articles']) && is_array($data['articles'])) {
 if (empty($articles) || !is_array($articles)) {
     push_log($token['id'], $token['api_key'], 'validation', 'error', 'articles 为空', 0);
     api_json(400, ['error' => 'empty', 'message' => '未提供任何文章']);
+}
+
+// 批量上限(防资源耗尽)
+$maxBatch = (int)($cfgApi['max_batch'] ?? 50);
+if ($maxBatch > 0 && count($articles) > $maxBatch) {
+    push_log($token['id'], $token['api_key'], 'validation', 'error', '批量数超限: ' . count($articles), 0);
+    api_json(400, ['error' => 'batch_too_large', 'message' => "单次最多推送 {$maxBatch} 篇文章，请分批"]);
 }
 
 $results = [];

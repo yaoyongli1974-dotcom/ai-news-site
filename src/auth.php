@@ -15,23 +15,121 @@ use PDO;
 /** 启动后台会话(仅在后台页面/登录流程调用) */
 function admin_session_start(): void
 {
-    $name = $GLOBALS['APP_CONFIG']['admin']['session_name'] ?? 'AIXALCY_ADMIN';
+    $cfg  = $GLOBALS['APP_CONFIG']['admin'] ?? [];
+    $name = $cfg['session_name'] ?? 'AIXALCY_ADMIN';
     if (session_status() === PHP_SESSION_NONE) {
         session_name($name);
+        // Cookie 安全标志: HttpOnly 防 XSS 窃取、Secure 仅限 HTTPS、SameSite 缓解 CSRF
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path'     => '/',
+            'domain'   => '',
+            'secure'   => is_https(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
         session_start();
+    }
+
+    // 空闲超时: 登录后超过 session_idle 秒无活动则销毁会话
+    $idle = (int)($cfg['session_idle'] ?? 1800);
+    if ($idle > 0 && !empty($_SESSION['admin_id'])) {
+        $last = (int)($_SESSION['last_activity'] ?? 0);
+        if ($last > 0 && (time() - $last) > $idle) {
+            admin_session_destroy();
+            return; // 本次请求按未登录处理，require_admin() 会跳转登录页
+        }
+        $_SESSION['last_activity'] = time();
     }
 }
 
-/** 验证管理员凭据，成功写入 session 并返回 true */
+/** 销毁当前会话并清除 cookie(不启动新会话) */
+function admin_session_destroy(): void
+{
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+            $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
+}
+
+// ---------------- 登录限流 ----------------
+
+/**
+ * 返回剩余锁定秒数，0 表示未锁定。
+ * 按「用户名」与「来源 IP」双维度统计窗口内失败次数，任一达到上限即锁定。
+ * login_attempts 表缺失(未跑迁移)时自动降级为不限流。
+ */
+function login_lockout_remaining(string $username): int
+{
+    $cfg = $GLOBALS['APP_CONFIG']['admin'] ?? [];
+    $max = (int)($cfg['login_max_attempts'] ?? 5);
+    $win = (int)($cfg['login_lockout'] ?? 900);
+    if ($max <= 0 || $win <= 0) return 0;
+
+    try {
+        // 顺手清理 1 天前的失败记录，保持表小巧
+        db_exec("DELETE FROM `login_attempts` WHERE `created_at` < ?", [time() - 86400]);
+        $row = db_fetch(
+            "SELECT COUNT(*) AS c, MAX(`created_at`) AS last
+             FROM `login_attempts`
+             WHERE (`username`=? OR `ip`=?) AND `created_at`>=?",
+            [$username, get_request_ip(), time() - $win]
+        );
+    } catch (PDOException $e) {
+        error_log('login_attempts 不可用(请执行 sql/security_hardening_migration.sql): ' . $e->getMessage());
+        return 0;
+    }
+    if ($row && (int)$row['c'] >= $max) {
+        return max(1, (int)$row['last'] + $win - time());
+    }
+    return 0;
+}
+
+/** 记录一次登录失败 */
+function login_record_failure(string $username): void
+{
+    try {
+        db_exec(
+            "INSERT INTO `login_attempts` (`username`,`ip`,`created_at`) VALUES (?,?,?)",
+            [$username, get_request_ip(), time()]
+        );
+    } catch (PDOException $e) {
+        error_log('login_attempts 不可用: ' . $e->getMessage());
+    }
+}
+
+/** 登录成功后清除该用户名/该 IP 的失败记录 */
+function login_clear_failures(string $username): void
+{
+    try {
+        db_exec("DELETE FROM `login_attempts` WHERE `username`=? OR `ip`=?", [$username, get_request_ip()]);
+    } catch (PDOException $e) {
+        error_log('login_attempts 不可用: ' . $e->getMessage());
+    }
+}
+
+/** 验证管理员凭据，成功写入 session 并返回 true；失败计入限流 */
 function admin_login(string $username, string $password): bool
 {
     $admin = db_fetch("SELECT * FROM `admins` WHERE `username`=?", [$username]);
-    if (!$admin) return false;
-    if (!password_verify($password, $admin['password_hash'])) return false;
+    // 用户不存在时也执行一次 password_verify，均衡耗时，防用户名枚举
+    $hash = $admin['password_hash'] ?? password_hash('timing-equalizer', PASSWORD_DEFAULT);
+    if (!$admin || !password_verify($password, $hash)) {
+        login_record_failure($username);
+        return false;
+    }
+    login_clear_failures($username);
     admin_session_start();
+    session_regenerate_id(true); // 防会话固定攻击
     $_SESSION['admin_id']   = (int)$admin['id'];
     $_SESSION['admin_name'] = $admin['username'];
     $_SESSION['admin_disp'] = $admin['display_name'] ?: $admin['username'];
+    $_SESSION['last_activity'] = time();
     return true;
 }
 
@@ -52,13 +150,7 @@ function require_admin(): void
 function admin_logout(): void
 {
     admin_session_start();
-    $_SESSION = [];
-    if (ini_get('session.use_cookies')) {
-        $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000,
-            $params['path'], $params['domain'], $params['secure'], $params['httponly']);
-    }
-    session_destroy();
+    admin_session_destroy();
 }
 
 // ---------------- CSRF ----------------
@@ -160,9 +252,7 @@ function api_auth_context(): array
         api_json(401, ['error' => 'invalid_token', 'message' => '令牌无效或已停用']);
     }
 
-    // 更新最近使用时间(不阻塞主流程)
-    db_exec("UPDATE `api_tokens` SET `last_used_at`=NOW() WHERE `id`=?", [$token['id']]);
-
+    // 最近使用时间在「验签通过后」更新(见 api_verify_signature)，避免无效请求刷时间
     return ['token' => $token, 'key' => $key, 'sig' => $sig, 'ts' => $ts, 'bearer' => $bearer];
 }
 
@@ -176,6 +266,8 @@ function api_verify_signature(array $ctx, string $base): void
 
     if ($ctx['sig'] === '') {
         if ($ctx['bearer'] !== '') {
+            // Bearer 方式无签名，无法做 nonce 去重(防重放依赖 HTTPS + 令牌可随时吊销)
+            db_exec("UPDATE `api_tokens` SET `last_used_at`=NOW() WHERE `id`=?", [$ctx['token']['id']]);
             return;   // Bearer 方式无需签名
         }
         push_log($ctx['token']['id'], $ctx['key'], 'auth_fail', 'error', '未提供签名', 0);
@@ -197,6 +289,27 @@ function api_verify_signature(array $ctx, string $base): void
         push_log($ctx['token']['id'], $ctx['key'], 'auth_fail', 'error', '签名校验失败', 0);
         api_json(401, ['error' => 'bad_signature', 'message' => '签名校验失败']);
     }
+
+    // nonce 去重: 同一 (key, ts, signature) 在 TTL 窗口内只接受一次，杜绝窗口内重放。
+    // api_nonces 表缺失(未跑迁移)时自动降级放行，不阻塞业务。
+    if (!empty($cfg['replay_protection'])) {
+        $nonce = hash('sha256', $ctx['key'] . '.' . $ctx['ts'] . '.' . $ctx['sig']);
+        try {
+            db_exec("INSERT INTO `api_nonces` (`nonce`,`expires_at`) VALUES (?,?)", [$nonce, (int)$ctx['ts'] + $ttl]);
+            // 概率性清理过期 nonce(约 1/20 的请求)，无需额外定时任务
+            if (random_int(1, 20) === 1) {
+                db_exec("DELETE FROM `api_nonces` WHERE `expires_at` < ?", [time()]);
+            }
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23000') { // 唯一键冲突 = 重放请求
+                push_log($ctx['token']['id'], $ctx['key'], 'auth_fail', 'error', '重复请求被拒绝(防重放)', 0);
+                api_json(401, ['error' => 'replayed', 'message' => '重复请求被拒绝(防重放)，请重新生成签名']);
+            }
+            error_log('api_nonces 不可用(请执行 sql/security_hardening_migration.sql): ' . $e->getMessage());
+        }
+    }
+
+    db_exec("UPDATE `api_tokens` SET `last_used_at`=NOW() WHERE `id`=?", [$ctx['token']['id']]);
 }
 
 /**
@@ -243,8 +356,11 @@ function api_require_auth_uploads(array $fileHashes, ?array $ctx = null): array
 function is_https(): bool
 {
     if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') return true;
-    if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') return true;
     if (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) return true;
+    // 仅在配置信任时才采信 X-Forwarded-Proto：
+    // 边缘代理必须覆写该头(见 deploy/nginx.conf)，否则客户端可伪造绕过 require_https
+    $trust = $GLOBALS['APP_CONFIG']['security']['trust_forwarded_proto'] ?? true;
+    if ($trust && ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') return true;
     return false;
 }
 

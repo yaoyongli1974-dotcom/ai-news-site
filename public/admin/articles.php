@@ -52,7 +52,7 @@ foreach ($articles as $r) {
         . '<td>' . e(date('Y-m-d', strtotime($r['published_at'] ?? $r['created_at']))) . '</td>'
         . '<td class="ops">'
           . '<a class="btn btn-sm" href="' . url('/admin/article_form.php?id=' . $r['id']) . '">编辑</a> '
-          . '<form method="post" style="display:inline" onsubmit="return confirm(\'确定删除该文章？\');">'
+          . '<form method="post" style="display:inline" data-confirm="确定删除该文章？">'
           . '<input type="hidden" name="csrf" value="' . attr(csrf_token()) . '">'
           . '<input type="hidden" name="action" value="delete">'
           . '<input type="hidden" name="id" value="' . $r['id'] . '">'

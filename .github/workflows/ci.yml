@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: ai_xalcy_test
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, mbstring, fileinfo, gd
+          coverage: none
+
+      - name: Prepare test config (指向 CI 测试库)
+        run: |
+          sed -e "s/'name'     => 'ai_xalcy'/'name'     => 'ai_xalcy_test'/" \
+              -e "s/'user'     => 'ai_xalcy'/'user'     => 'test'/" \
+              -e "s/'pass'     => 'CHANGE_ME'/'pass'     => 'test'/" \
+              config.example.php > config.php
+
+      - name: Smoke tests (php -l 全量 + MySQL 集成)
+        run: php tests/run.php --db

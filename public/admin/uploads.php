@@ -165,7 +165,7 @@ ob_start();
             <div class="media-ops">
               <button type="button" class="btn btn-sm" data-copy="<?= attr($f['url']) ?>">复制链接</button>
               <form method="post" style="display:inline"
-                    onsubmit="return confirm('确定删除这个<?= $isVideo ? '视频' : '图片' ?>？已引用它的文章会显示裂图/失效。');">
+                    data-confirm="确定删除这个<?= $isVideo ? '视频' : '图片' ?>？已引用它的文章会显示裂图/失效。">
                 <input type="hidden" name="csrf" value="<?= attr($csrf) ?>">
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="media" value="<?= $type ?>">
@@ -181,36 +181,6 @@ ob_start();
   <?php endif; ?>
 </div>
 
-<script>
-// 复制链接：优先 Clipboard API，非安全上下文退回 execCommand
-document.addEventListener('click', function (ev) {
-  var btn = ev.target.closest('[data-copy]');
-  if (!btn) { return; }
-  var text  = btn.getAttribute('data-copy');
-  var label = btn.textContent;
-  var done  = function () {
-    btn.textContent = '已复制';
-    setTimeout(function () { btn.textContent = label; }, 1200);
-  };
-  var fallback = function () {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.top = '-1000px';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); done(); }
-    catch (e) { window.prompt('请手动复制链接', text); }
-    document.body.removeChild(ta);
-  };
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).then(done, fallback);
-  } else {
-    fallback();
-  }
-});
-</script>
 <?php
 $body = (string)ob_get_clean();
 admin_layout('媒体库', $body, 'uploads');

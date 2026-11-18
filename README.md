@@ -15,37 +15,46 @@
 ```
 ai.xalcy.cn/
 ├── config.example.php        # 配置样例(复制为 config.php 使用)
-├── sql/schema.sql           # 数据库结构 + 初始化数据
+├── sql/schema.sql           # 数据库结构 + 初始化数据(12 张表)
+├── sql/security_hardening_migration.sql  # 老库升级: 登录限流表 + API 防重放表(幂等)
+├── sql/search_fulltext_migration.sql     # 老库升级: 搜索 FULLTEXT(ngram) 索引(仅 MySQL)
 ├── src/                     # 核心代码(位于 web 根之外,不可被直接访问)
-│   ├── bootstrap.php        # 引导: 配置/DB/自动加载/错误处理
+│   ├── bootstrap.php        # 引导: 配置/DB/错误处理/安全响应头
 │   ├── db.php               # PDO 连接与查询助手
-│   ├── functions.php        # 通用函数(转义/slug/分页/CSRF/选项)
-│   ├── auth.php             # 后台会话鉴权 + 推送/上传 API 签名鉴权
+│   ├── functions.php        # 通用函数(转义/slug/分页/选项/URL)
+│   ├── auth.php             # 后台会话鉴权(安全 Cookie/限流) + API 签名鉴权(防重放)
 │   ├── view.php             # 前台布局渲染
 │   ├── admin_view.php       # 后台布局渲染
-│   ├── article_service.php  # 文章写服务(后台与 API 共用)
+│   ├── article_service.php  # 文章写服务(事务化,后台与 API 共用)
+│   ├── topic_service.php    # 专题服务
 │   └── upload_service.php   # 图片/视频/品牌图上传服务(校验/命名/落盘,后台与 API 共用)
 ├── public/                  # ← 网站根目录(DocumentRoot 指向这里)
-│   ├── index.php            # 首页(列表+分页)
+│   ├── index.php            # 首页(列表+分页;未知路径返回真 404)
 │   ├── article.php          # 文章详情
 │   ├── category.php         # 分类页
 │   ├── tag.php              # 标签页
-│   ├── search.php           # 搜索
-│   ├── assets/              # 前台/后台 CSS
+│   ├── search.php           # 搜索(FULLTEXT 优先,自动回退 LIKE)
+│   ├── topics.php / topic.php # 专题列表/详情
+│   ├── llms.php             # 动态 llms.txt(与后台站点设置实时一致)
+│   ├── sitemap.php / robots.txt
+│   ├── 404.html             # 自定义 404 页
+│   ├── assets/              # 前台/后台 CSS + admin.js(后台交互,CSP 友好)
 │   │   ├── uploads/         # ← 图片上传目录(自动创建;内含 .htaccess 禁脚本)
 │   │   ├── videos/          # ← 视频上传目录(自动创建;内含 .htaccess 禁脚本)
 │   │   └── branding/        # ← 品牌图目录(LOGO/图标,自动创建;内含 .htaccess 禁脚本)
-│   ├── admin/               # 后台模块(login/logout/index/articles/uploads/categories/tags/settings/api_tokens)
+│   ├── admin/               # 后台模块(login/logout/index/articles/uploads/categories/tags/topics/settings/api_tokens)
 │   └── api/                 # push.php(推文章) / upload.php(传图片) / upload_video.php(传视频)
 ├── scripts/                 # 运维脚本
 │   ├── setup.php            # 初始化管理员 + 首个令牌(CLI)
 │   ├── check_db.php         # 数据库连通性自检(容器环境排查 db.host 用)
+│   ├── rotate_push_logs.php # 推送审计日志轮转(CLI,建议 cron 每日执行)
 │   ├── push_client.php      # 推送客户端(CLI,供 cron 调用)
 │   ├── upload_client.php    # 上传客户端(CLI,自动算摘要签名;支持 --type=video)
 │   └── sample_payload.json  # 推送请求示例
+├── tests/                   # 冒烟测试(php -l 全量 + MySQL 集成,见 tests/README.md)
 └── deploy/                  # 部署配置样例
-    ├── nginx.conf           # 裸装 Nginx 用(含上传目录禁执行规则)
-    ├── nginx-uploads-snippet.conf # 上传目录安全片段(1Panel 粘贴用)
+    ├── nginx.conf           # 裸装 Nginx 用(含上传目录禁执行/真 404/XFP 覆写)
+    ├── nginx-uploads-snippet.conf # 上传目录安全片段 + 加固配套片段(1Panel 粘贴用)
     ├── apache.htaccess
     ├── crontab.example
     └── 1panel.sh            # 1Panel(Docker) 运维脚本: doctor/db-import/setup
@@ -63,6 +72,14 @@ USE ai_xalcy;
 SOURCE /var/www/ai.xalcy.cn/sql/schema.sql;
 # 或单行: mysql -u<user> -p ai_xalcy < sql/schema.sql
 ```
+
+**已上线的老库升级**（不要重导 schema.sql，会清空数据）：
+```bash
+mysql -u<user> -p ai_xalcy < sql/security_hardening_migration.sql   # 登录限流 + API 防重放(幂等,必做)
+mysql -u<user> -p ai_xalcy < sql/search_fulltext_migration.sql      # 搜索 FULLTEXT 索引(仅 MySQL;MariaDB 跳过,自动回退 LIKE)
+# 若尚未建专题表: mysql -u<user> -p ai_xalcy < sql/topics_migration.sql
+```
+> 未导入加固迁移时站点仍可运行：登录限流与防重放自动降级关闭（日志会有提示），建议尽快导入。
 
 ### 2. 配置
 ```bash
@@ -104,7 +121,10 @@ X-Timestamp:  <Unix 秒级时间戳>
 X-Signature:  <HMAC-SHA256( timestamp + "." + 原始请求体 , API_SECRET ) 的十六进制>
 ```
 - `X-Signature` 需对 **原始请求体字节** 计算，签名串格式为 `时间戳.请求体`。
-- 服务器校验时间戳与当前时间差 ≤ `api.signature_ttl`（默认 300 秒），防重放。
+- 服务器校验时间戳与当前时间差 ≤ `api.signature_ttl`（默认 300 秒）。
+- **防重放**（`api.replay_protection`，默认开）：同一签名在时间窗内只能使用一次，重复提交返回 `401 replayed`。
+  依赖 `api_nonces` 表（老库先导入 `sql/security_hardening_migration.sql`；表缺失时自动降级为仅时间窗校验）。
+  失败重试请**重新生成时间戳与签名**（客户端脚本已自动处理）；带 `source_id` 的重复推送本身也是幂等的。
 
 **方式二 · Bearer 令牌**
 ```
@@ -132,6 +152,10 @@ Authorization: Bearer <API_SECRET>
 }
 ```
 > 单篇可直接 POST 一个对象。强烈建议提供 `source_id`，重复推送（含失败重试）不会重复入库。
+
+**体积与批量限制**（可在 `config.php` 调整）：
+- 请求体 ≤ `api.max_body_bytes`（默认 5MB），超限返回 `413 body_too_large`；
+- 单批 ≤ `api.max_batch` 篇（默认 50），超限返回 `400 batch_too_large`，请拆分批次。
 
 ### 响应
 ```json
@@ -183,6 +207,8 @@ print(r.status_code, r.json())
 参考 `deploy/crontab.example`：
 ```cron
 0 9,21 * * * /usr/bin/php /var/www/ai.xalcy.cn/scripts/push_client.php /data/wx_articles/today.json >> /var/log/ai_xalcy_push.log 2>&1
+# 审计日志轮转（默认保留 90 天，api.log_retention_days 可调）
+30 3 * * * /usr/bin/php /var/www/ai.xalcy.cn/scripts/rotate_push_logs.php >> /var/log/ai_xalcy_rotate.log 2>&1
 ```
 > AI 也可自行调度，无需系统 cron——只要能发出带签名的 HTTPS 请求即可。
 
@@ -543,13 +569,25 @@ for f in res["files"]:
 
 ## 五、安全建议
 
+**已内置的加固（2026-11 版）**：
+- 后台会话 Cookie 强制 `HttpOnly + Secure(HTTPS 时) + SameSite=Lax`；登录成功 `session_regenerate_id` 防会话固定；空闲超时（`admin.session_idle`，默认 30 分钟）。
+- 登录 CSRF 校验 + 失败限流锁定（`admin.login_max_attempts` 次 / `admin.login_lockout` 秒，按用户名与 IP 双维度，依赖 `login_attempts` 表）。
+- API 签名防重放（nonce 一次性，`api.replay_protection`）；推送批量/体积上限；`push_logs` 轮转脚本。
+- 全站安全响应头：CSP、`X-Frame-Options`（后台 DENY）、`X-Content-Type-Options: nosniff`、`Referrer-Policy`；移除 `X-Powered-By`。
+- 未知路径返回真 404（不再兜底首页）；`llms.txt` 动态生成，与站点设置一致。
+- `save_article` 事务化；搜索 FULLTEXT(ngram) 优先、LIKE 通配符转义。
+
+**仍需部署侧配合**：
 1. **HTTPS 强制**：生产在 `config.php` 将 `api.require_https` 设为 `true`（默认已开），并配置全站 HTTPS。
-2. **密钥保管**：`API_SECRET` 等同写权限，仅存于调用方与数据库；泄露立即在后台吊销令牌。
-3. **最小权限**：MySQL 账号仅授予该库 `SELECT/INSERT/UPDATE/DELETE`；Web 进程不可写 `config.php`。
-4. **目录隔离**：确保 `DocumentRoot` 为 `public/`，`src/`、`config.php`、`sql/` 不在 web 可访问范围。
-5. **改默认口令**：首次登录后立即修改管理员密码，并删除/停用测试令牌。
-6. **审计**：所有推送调用记录在 `push_logs` 表，可定期巡查异常 IP/频率。
-7. **内容可信**：文章正文按可信 HTML 处理（后台与接口写入），若接受第三方内容请增加净化（如 HTMLPurifier）。
+2. **边缘覆写 `X-Forwarded-Proto`**：`is_https()` 信任该头（`security.trust_forwarded_proto`）。Nginx 直连 PHP 时按 `deploy/nginx.conf` 加 `fastcgi_param HTTP_X_FORWARDED_PROTO $scheme;`；前面还有代理/CDN 时，在最外层用 `proxy_set_header X-Forwarded-Proto $scheme;` 覆写，否则可伪造该头绕过 HTTPS 检查。不放心可把 `security.trust_forwarded_proto` 设为 `false`（此时仅认 `HTTPS`/443 端口）。
+3. **1Panel 用户**：把 `deploy/nginx-uploads-snippet.conf` 的两段（上传目录禁执行 + 加固配套：llms 重写/真 404/XFP 覆写）贴进站点配置。
+4. **老库升级**：导入 `sql/security_hardening_migration.sql`（必做）与 `sql/search_fulltext_migration.sql`（MySQL 建议）。
+5. **密钥保管**：`API_SECRET` 等同写权限，仅存于调用方与数据库；泄露立即在后台吊销令牌。
+6. **最小权限**：MySQL 账号仅授予该库 `SELECT/INSERT/UPDATE/DELETE`（建表/迁移时临时需要 DDL 权限）；Web 进程不可写 `config.php`。
+7. **目录隔离**：确保 `DocumentRoot` 为 `public/`，`src/`、`config.php`、`sql/` 不在 web 可访问范围。
+8. **改默认口令**：首次登录后立即修改管理员密码，并删除/停用测试令牌。
+9. **审计**：所有推送调用记录在 `push_logs` 表，配合 `scripts/rotate_push_logs.php` 定期轮转；可巡查异常 IP/频率。
+10. **内容可信**：文章正文按可信 HTML 处理（后台与接口写入），若接受第三方内容请增加净化（如 HTMLPurifier）。
 
 ---
 
@@ -557,12 +595,17 @@ for f in res["files"]:
 
 ```bash
 # 1. 启动内置 PHP 服务(需本机装 PHP 8)
-cd public && php -S 127.0.0.1:8080
+#    用 dev_router.php 作路由：模拟 Nginx 的伪静态重写 / llms.txt / 真 404，
+#    直接 cd public && php -S 也能跑，但伪静态与真 404 行为与线上不一致。
+php -S 127.0.0.1:8080 -t public scripts/dev_router.php
 # 2. 浏览器访问 http://127.0.0.1:8080/
-# 3. 语法自检
-find . -name '*.php' -exec php -l {} \;
+# 3. 自动化检查（语法全量自检 + 可选数据库集成测试）
+php tests/run.php          # 仅 php -l 全量语法检查
+php tests/run.php --db     # 另需 config.php 指向测试库 + mysql CLI：
+                           # schema 导入/迁移幂等/FULLTEXT/幂等推送/登录锁定/nonce/日志轮转
 ```
 > 本地用 HTTP 测试推送接口时，请把 `config.php` 中 `api.require_https` 临时设为 `false`，否则会返回 403（生产环境务必保持 `true`）。
+> 集成测试会**清空并重建** config.php 指向的数据库，切勿指向生产库。CI 见 `.github/workflows/ci.yml`（PHP 8.4 + MySQL 8）。
 
 ---
 
@@ -642,7 +685,7 @@ docker exec php8-fpm php /www/sites/ai.xalcy.cn/index/scripts/check_db.php mysql
 >>> 请把 config.php 的 db.host 改为: mysql
 ```
 
-把结论填回 `config.php` 的 `db.host`，再跑一次直到显示「配置正确」。该脚本同时会校验 8 张表是否齐全、列出管理员/令牌/文章数量。
+把结论填回 `config.php` 的 `db.host`，再跑一次直到显示「配置正确」。该脚本同时会校验 12 张表是否齐全、列出管理员/令牌/文章数量。
 
 > `scripts/check_db.php` 会自动追加候选 host：`config.php` 当前值、命令参数、`mysql`、`mariadb`、
 > `host.docker.internal`，以及从 `/proc/net/route` 解析出的 Docker 网关（如 `172.18.0.1`）。

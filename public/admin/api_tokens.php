@@ -65,7 +65,7 @@ foreach ($list as $t) {
         . '<td>' . e($t['created_at']) . '</td>'
         . '<td class="ops">'
           . '<form method="post" style="display:inline"><input type="hidden" name="csrf" value="' . attr(csrf_token()) . '"><input type="hidden" name="action" value="toggle"><input type="hidden" name="id" value="' . $t['id'] . '"><button class="btn btn-sm" type="submit">' . ($t['status']==='active'?'停用':'启用') . '</button></form> '
-          . '<form method="post" style="display:inline" onsubmit="return confirm(\'确定删除该令牌？\');"><input type="hidden" name="csrf" value="' . attr(csrf_token()) . '"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' . $t['id'] . '"><button class="btn btn-sm btn-danger" type="submit">删除</button></form>'
+          . '<form method="post" style="display:inline" data-confirm="确定删除该令牌？"><input type="hidden" name="csrf" value="' . attr(csrf_token()) . '"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' . $t['id'] . '"><button class="btn btn-sm btn-danger" type="submit">删除</button></form>'
         . '</td></tr>';
 }
 

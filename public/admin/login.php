@@ -14,8 +14,13 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = trim((string)($_POST['username'] ?? ''));
     $pass = (string)($_POST['password'] ?? '');
-    if ($user === '' || $pass === '') {
+    if (!csrf_verify()) {
+        $error = '会话已过期，请刷新页面后重试';
+    } elseif ($user === '' || $pass === '') {
         $error = '请输入用户名与密码';
+    } elseif (($locked = login_lockout_remaining($user)) > 0) {
+        http_response_code(429);
+        $error = '失败次数过多，已临时锁定，请 ' . (int)ceil($locked / 60) . ' 分钟后重试';
     } elseif (admin_login($user, $pass)) {
         redirect(url('/admin/index.php'));
     } else {
@@ -45,13 +50,14 @@ header('Content-Type: text/html; charset=utf-8');
     <p class="sub">后台管理系统登录</p>
     <?php if ($error): ?><div class="err"><?= e($error) ?></div><?php endif; ?>
     <form method="post">
+      <input type="hidden" name="csrf" value="<?= attr(csrf_token()) ?>">
       <div class="form-row">
         <label>用户名</label>
-        <input type="text" name="username" autofocus required>
+        <input type="text" name="username" autocomplete="username" autofocus required>
       </div>
       <div class="form-row">
         <label>密码</label>
-        <input type="password" name="password" required>
+        <input type="password" name="password" autocomplete="current-password" required>
       </div>
       <button class="btn btn-primary" style="width:100%" type="submit">登录</button>
     </form>

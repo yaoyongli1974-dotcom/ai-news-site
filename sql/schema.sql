@@ -9,6 +9,8 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS `api_nonces`;
+DROP TABLE IF EXISTS `login_attempts`;
 DROP TABLE IF EXISTS `push_logs`;
 DROP TABLE IF EXISTS `topic_articles`;
 DROP TABLE IF EXISTS `topics`;
@@ -162,6 +164,25 @@ CREATE TABLE `topic_articles` (
   CONSTRAINT `fk_ta_article` FOREIGN KEY (`article_id`)
     REFERENCES `articles` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='专题文章关联';
+
+-- ---------- 后台登录失败记录(限流/锁定) ----------
+CREATE TABLE `login_attempts` (
+  `id`         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `username`   VARCHAR(60)  NOT NULL COMMENT '尝试登录的用户名',
+  `ip`         VARCHAR(45)  NOT NULL DEFAULT '' COMMENT '来源 IP',
+  `created_at` INT UNSIGNED NOT NULL COMMENT '失败时间(Unix 时间戳)',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_time` (`username`, `created_at`),
+  KEY `idx_ip_time` (`ip`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='后台登录失败记录(限流)';
+
+-- ---------- API 签名 nonce(防重放) ----------
+CREATE TABLE `api_nonces` (
+  `nonce`      CHAR(64)     NOT NULL COMMENT 'sha256(api_key.ts.signature)',
+  `expires_at` INT UNSIGNED NOT NULL COMMENT '签名过期时间(Unix 时间戳)，过期后可清理',
+  PRIMARY KEY (`nonce`),
+  KEY `idx_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='已使用的 API 签名 nonce(防重放)';
 
 SET FOREIGN_KEY_CHECKS = 1;
 

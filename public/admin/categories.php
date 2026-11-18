@@ -49,7 +49,7 @@ $rows = '';
 foreach ($list as $c) {
     $rows .= '<tr><td>' . e($c['name']) . '</td><td class="mono">' . e($c['slug']) . '</td><td>' . e($c['description']) . '</td><td>' . (int)$c['sort_order'] . '</td>'
         . '<td class="ops"><a class="btn btn-sm" href="' . url('/admin/categories.php?edit=' . $c['id']) . '">编辑</a> '
-        . '<form method="post" style="display:inline" onsubmit="return confirm(\'确定删除？\');"><input type="hidden" name="csrf" value="' . attr(csrf_token()) . '"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' . $c['id'] . '"><button class="btn btn-sm btn-danger" type="submit">删除</button></form></td></tr>';
+        . '<form method="post" style="display:inline" data-confirm="确定删除？"><input type="hidden" name="csrf" value="' . attr(csrf_token()) . '"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' . $c['id'] . '"><button class="btn btn-sm btn-danger" type="submit">删除</button></form></td></tr>';
 }
 
 $body = '<form method="post" class="admin-content" style="margin-bottom:22px"><input type="hidden" name="csrf" value="' . attr(csrf_token()) . '">'

@@ -101,7 +101,11 @@ $pdo = new PDO(
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
 );
 
-$required = ['admins', 'api_tokens', 'articles', 'article_tags', 'categories', 'tags', 'push_logs', 'options'];
+$required = [
+    'admins', 'api_tokens', 'articles', 'article_tags', 'categories', 'tags',
+    'push_logs', 'options', 'topics', 'topic_articles',
+    'login_attempts', 'api_nonces', // 2026-11 安全加固新增
+];
 $missing  = [];
 foreach ($required as $t) {
     $row = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($t))->fetch();
@@ -111,7 +115,9 @@ foreach ($required as $t) {
 }
 
 if ($missing) {
-    echo "数据表: 缺少 " . implode(', ', $missing) . " —— 请先导入 sql/schema.sql\n";
+    echo "数据表: 缺少 " . implode(', ', $missing) . "\n";
+    echo "  新库请导入 sql/schema.sql；已有库升级请执行 sql/security_hardening_migration.sql\n";
+    echo "  (topics/topic_articles 缺失时可执行 sql/topics_migration.sql)\n";
 } else {
     $admins = (int)$pdo->query('SELECT COUNT(*) AS c FROM `admins`')->fetch()['c'];
     $tokens = (int)$pdo->query('SELECT COUNT(*) AS c FROM `api_tokens`')->fetch()['c'];

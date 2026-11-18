@@ -24,6 +24,10 @@ return [
     'api' => [
         'require_https' => true,     // 非 HTTPS 直接拒绝(建议生产开启)
         'signature_ttl' => 300,     // 签名有效期(秒)，防重放，默认 5 分钟
+        'replay_protection' => true, // 签名 nonce 去重(需 api_nonces 表，见 sql/security_hardening_migration.sql)
+        'max_batch'     => 50,      // 单次推送最多文章数(0 = 不限制，不建议)
+        'max_body_bytes' => 5 * 1024 * 1024, // 推送请求体上限(字节)，默认 5MB
+        'log_retention_days' => 90, // push_logs 保留天数(scripts/rotate_push_logs.php 定期清理)
     ],
 
     // ---- 图片上传 ----
@@ -64,6 +68,18 @@ return [
     'admin' => [
         'session_name' => 'AIXALCY_ADMIN',
         'route_prefix' => '/admin',  // 后台访问前缀(配合 rewrite 时使用)
+        'session_idle' => 1800,      // 会话空闲超时(秒)，默认 30 分钟；0 = 不超时
+        'login_max_attempts' => 5,   // 统计窗口内同一用户名/同一 IP 最多失败次数
+        'login_lockout' => 900,      // 登录失败统计窗口/锁定时长(秒)，默认 15 分钟
+    ],
+
+    // ---- 通用安全 ----
+    'security' => [
+        // 是否信任 X-Forwarded-Proto 判定 HTTPS。
+        // 仅当站点位于「会覆写该头」的可信反向代理(如 1Panel/OpenResty/Nginx)之后时开启；
+        // 边缘必须用 proxy_set_header X-Forwarded-Proto $scheme; 覆写客户端传入值，
+        // 否则客户端可伪造该头绕过 require_https。直连暴露 PHP 时请设为 false。
+        'trust_forwarded_proto' => true,
     ],
 
     // 安全相关：用于在 cookie 之外增加一层盐(可选)

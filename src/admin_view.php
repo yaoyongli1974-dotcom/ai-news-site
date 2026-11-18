@@ -51,6 +51,7 @@ function admin_layout(string $title, string $body, string $active = ''): void
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= e($title) ?> · 后台管理</title>
   <link rel="stylesheet" href="<?= asset('/assets/admin.css') ?>">
+  <script src="<?= asset('/assets/admin.js') ?>" defer></script>
 </head>
 <body>
   <div class="admin-shell">

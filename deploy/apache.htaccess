@@ -7,6 +7,9 @@
 
 RewriteEngine On
 
+# llms.txt 由动态脚本生成（始终与后台站点设置一致），静态文件已移除
+RewriteRule ^llms\.txt$ llms.php [L]
+
 # 阻止访问隐藏文件与敏感后缀
 <FilesMatch "^\.">
     Require all denied
@@ -26,10 +29,12 @@ RewriteRule ^search/?$ search.php?__pu=1 [QSA,L]
 RewriteRule ^topics/?$ topics.php?__pu=1 [QSA,L]
 RewriteRule ^topic/([^/]+)/?$ topic.php?slug=$1&__pu=1 [QSA,L]
 
-# 若请求的不是真实文件/目录，交由 index.php 处理(当前站点采用文件型 URL，此项可选)
+# 请求非真实文件/目录时返回真 404（避免任意路径都 200+首页造成 SEO 重复内容）
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.php [QSA,L]
+RewriteRule ^ - [R=404,L]
+
+ErrorDocument 404 /404.html
 
 # 默认文档
 DirectoryIndex index.php

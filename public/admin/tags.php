@@ -46,7 +46,7 @@ $rows = '';
 foreach ($list as $t) {
     $rows .= '<tr><td>' . e($t['name']) . '</td><td class="mono">' . e($t['slug']) . '</td><td>' . (int)$t['cnt'] . '</td>'
         . '<td class="ops"><a class="btn btn-sm" href="' . url('/admin/tags.php?edit=' . $t['id']) . '">编辑</a> '
-        . '<form method="post" style="display:inline" onsubmit="return confirm(\'确定删除？关联将解除\');"><input type="hidden" name="csrf" value="' . attr(csrf_token()) . '"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' . $t['id'] . '"><button class="btn btn-sm btn-danger" type="submit">删除</button></form></td></tr>';
+        . '<form method="post" style="display:inline" data-confirm="确定删除？关联将解除"><input type="hidden" name="csrf" value="' . attr(csrf_token()) . '"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="' . $t['id'] . '"><button class="btn btn-sm btn-danger" type="submit">删除</button></form></td></tr>';
 }
 
 $body = '<form method="post" class="admin-content" style="margin-bottom:22px"><input type="hidden" name="csrf" value="' . attr(csrf_token()) . '">'

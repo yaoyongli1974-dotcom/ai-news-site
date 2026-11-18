@@ -84,55 +84,65 @@ function save_article(array $data): array
                   ?? date('Y-m-d H:i:s');
     $categoryId = resolve_category_id($data['category'] ?? ($data['category_id'] ?? null));
 
-    // 决定目标行
-    $existingId = 0;
-    if ($id > 0) {
-        $row = db_fetch("SELECT `id` FROM `articles` WHERE `id`=?", [$id]);
-        if ($row) $existingId = (int)$row['id'];
-    }
-    if ($existingId === 0 && $sourceId !== null) {
-        $row = db_fetch("SELECT `id` FROM `articles` WHERE `source_id`=?", [$sourceId]);
-        if ($row) $existingId = (int)$row['id'];
-    }
-    // 注意：新增(id=0)不再按 slug 反查已存在行——否则空 slug（slugify 默认 'item'）/
-    // 重复 slug 会被误判为"更新"而覆盖历史文章。slug 唯一性由 unique_slug() 在插入时保证。
+    // ---- 事务：文章写入与标签同步要么全部成功，要么整体回滚 ----
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        // 决定目标行
+        $existingId = 0;
+        if ($id > 0) {
+            $row = db_fetch("SELECT `id` FROM `articles` WHERE `id`=?", [$id]);
+            if ($row) $existingId = (int)$row['id'];
+        }
+        if ($existingId === 0 && $sourceId !== null) {
+            $row = db_fetch("SELECT `id` FROM `articles` WHERE `source_id`=?", [$sourceId]);
+            if ($row) $existingId = (int)$row['id'];
+        }
+        // 注意：新增(id=0)不再按 slug 反查已存在行——否则空 slug（slugify 默认 'item'）/
+        // 重复 slug 会被误判为"更新"而覆盖历史文章。slug 唯一性由 unique_slug() 在插入时保证。
 
-    if ($existingId > 0) {
-        // 更新：slug 仅在显式提供且不与他者冲突时更新
-        $finalSlug = $slug !== '' ? unique_slug($slug, $existingId) : db_fetch("SELECT `slug` FROM `articles` WHERE `id`=?", [$existingId])['slug'];
-        db_exec(
-            "UPDATE `articles` SET `title`=?,`slug`=?,`summary`=?,`content`=?,`cover_image`=?,
-             `author`=?,`source_url`=?,`source_id`=?,`category_id`=?,`status`=?,`published_at`=?
-             WHERE `id`=?",
-            [$title, $finalSlug, $summary, $content, $cover, $author, $sourceUrl, $sourceId, $categoryId, $status, $published, $existingId]
-        );
-        $articleId = $existingId;
-        $action = 'updated';
-    } else {
-        $finalSlug = unique_slug($slug);
-        $articleId = db_insert(
-            "INSERT INTO `articles`
-             (`title`,`slug`,`summary`,`content`,`cover_image`,`author`,`source_url`,`source_id`,`category_id`,`status`,`published_at`)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            [$title, $finalSlug, $summary, $content, $cover, $author, $sourceUrl, $sourceId, $categoryId, $status, $published]
-        );
-        $action = 'created';
-    }
+        if ($existingId > 0) {
+            // 更新：slug 仅在显式提供且不与他者冲突时更新
+            $finalSlug = $slug !== '' ? unique_slug($slug, $existingId) : db_fetch("SELECT `slug` FROM `articles` WHERE `id`=?", [$existingId])['slug'];
+            db_exec(
+                "UPDATE `articles` SET `title`=?,`slug`=?,`summary`=?,`content`=?,`cover_image`=?,
+                 `author`=?,`source_url`=?,`source_id`=?,`category_id`=?,`status`=?,`published_at`=?
+                 WHERE `id`=?",
+                [$title, $finalSlug, $summary, $content, $cover, $author, $sourceUrl, $sourceId, $categoryId, $status, $published, $existingId]
+            );
+            $articleId = $existingId;
+            $action = 'updated';
+        } else {
+            $finalSlug = unique_slug($slug);
+            $articleId = db_insert(
+                "INSERT INTO `articles`
+                 (`title`,`slug`,`summary`,`content`,`cover_image`,`author`,`source_url`,`source_id`,`category_id`,`status`,`published_at`)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                [$title, $finalSlug, $summary, $content, $cover, $author, $sourceUrl, $sourceId, $categoryId, $status, $published]
+            );
+            $action = 'created';
+        }
 
-    // 同步标签
-    $tagIds = [];
-    $rawTags = $data['tags'] ?? [];
-    if (is_string($rawTags)) {
-        $rawTags = array_filter(array_map('trim', explode(',', $rawTags)));
-    }
-    foreach ($rawTags as $t) {
-        $tid = get_or_create_tag((string)$t);
-        if ($tid > 0) $tagIds[] = $tid;
-    }
-    $tagIds = array_values(array_unique($tagIds));
-    db_exec("DELETE FROM `article_tags` WHERE `article_id`=?", [$articleId]);
-    foreach ($tagIds as $tid) {
-        db_exec("INSERT IGNORE INTO `article_tags` (`article_id`,`tag_id`) VALUES (?,?)", [$articleId, $tid]);
+        // 同步标签
+        $tagIds = [];
+        $rawTags = $data['tags'] ?? [];
+        if (is_string($rawTags)) {
+            $rawTags = array_filter(array_map('trim', explode(',', $rawTags)));
+        }
+        foreach ($rawTags as $t) {
+            $tid = get_or_create_tag((string)$t);
+            if ($tid > 0) $tagIds[] = $tid;
+        }
+        $tagIds = array_values(array_unique($tagIds));
+        db_exec("DELETE FROM `article_tags` WHERE `article_id`=?", [$articleId]);
+        foreach ($tagIds as $tid) {
+            db_exec("INSERT IGNORE INTO `article_tags` (`article_id`,`tag_id`) VALUES (?,?)", [$articleId, $tid]);
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
     }
 
     return ['id' => $articleId, 'action' => $action, 'slug' => $finalSlug];

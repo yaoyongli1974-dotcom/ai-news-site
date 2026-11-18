@@ -78,7 +78,7 @@ foreach ($list as $t) {
         . '<td>' . (int)$t['sort_order'] . '</td>'
         . '<td class="ops">'
           . '<a class="btn btn-sm" href="' . url('/admin/topics.php?edit=' . $t['id']) . '">编辑</a> '
-          . '<form method="post" style="display:inline" onsubmit="return confirm(\'确定删除该专题？关联文章不会被删除，仅解除关联。\');">'
+          . '<form method="post" style="display:inline" data-confirm="确定删除该专题？关联文章不会被删除，仅解除关联。">'
           . '<input type="hidden" name="csrf" value="' . attr(csrf_token()) . '">'
           . '<input type="hidden" name="action" value="delete">'
           . '<input type="hidden" name="id" value="' . $t['id'] . '">'
